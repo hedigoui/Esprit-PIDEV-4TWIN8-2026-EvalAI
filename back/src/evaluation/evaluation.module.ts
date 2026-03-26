@@ -7,14 +7,14 @@ import { OralEvaluation } from './entities/oral-evaluation.entity';
 import { OralPerformance } from '../oral-performance/oral-performance.entity';
 import { AssemblyAIModule } from '../assemblyai/assemblyai.module';
 import { GridFSModule } from '../gridfs/gridfs.module';
-import { GeminiModule } from 'src/gemini/gemini.module';
+import { DeepSeekModule } from '../deepseek/deepseek.module'; // Import DeepSeekModule
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([OralEvaluation, OralPerformance]),
     AssemblyAIModule,
     GridFSModule,
-    GeminiModule,
+    DeepSeekModule, // Add DeepSeekModule here
   ],
   controllers: [EvaluationController],
   providers: [EvaluationService],

@@ -1,4 +1,4 @@
-.tabContainer {
+/* .tabContainer {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 2rem;
@@ -256,4 +256,395 @@
   color: #666666;
   font-size: 0.8rem;
   line-height: 1.4;
+} */
+/* src/pages/student/Practice.module.css */
+
+.tabContainer {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(0,0,0,0.04);
+  color: #64748b;
+}
+
+.tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.activeTab {
+  background: #E31837;
+  color: white;
+}
+
+.practiceGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.recordingArea {
+  padding: 1rem;
+}
+
+.videoPreview {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #f8fafc;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.recordingControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 1rem;
+}
+
+.controlBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.controlBtn:hover {
+  background: #f8fafc;
+}
+
+.recordBtn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid #E31837;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #E31837;
+}
+
+.recordBtn.recording {
+  background: #E31837;
+  color: white;
+}
+
+.timer {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #0f172a;
+}
+
+.micIndicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.uploadArea {
+  padding: 3rem 2rem;
+  text-align: center;
+  border: 2px dashed #e2e8f0;
+  border-radius: 12px;
+}
+
+.uploadArea h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.uploadArea p {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.fileHint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.aiDisclaimer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(59,130,246,0.06);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #3b82f6;
+  margin-bottom: 1rem;
+}
+
+.loadingState {
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+}
+
+.scoreCircle {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.scoreValue {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.scoreLabel {
+  font-size: 1rem;
+  opacity: 0.9;
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.metricCard {
+  background: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.metricCard span {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.metricCard strong {
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.feedbackDetails {
+  background: #f1f5f9;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.feedbackDetails h4 {
+  font-size: 0.9rem;
+  margin: 1rem 0 0.5rem;
+  color: #1e293b;
+}
+
+.feedbackDetails h4:first-of-type {
+  margin-top: 0;
+}
+
+.feedbackDetails ul {
+  margin: 0 0 0.5rem 0;
+  padding-left: 1.5rem;
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+.feedbackDetails li {
+  margin-bottom: 0.25rem;
+}
+
+.cefrLevel {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.transcript {
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #334155;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+}
+
+.transcript h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: #1e293b;
+}
+
+.transcript p {
+  margin: 0;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 2rem;
+}
+
+.emptyState p {
+  color: #64748b;
+  margin: 1rem 0;
+}
+
+.metricsPreview {
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.metricItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.metricItem:last-child {
+  border-bottom: none;
+}
+
+.errorMessage {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.successMessage {
+  background: #d1fae5;
+  color: #059669;
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statusBanner {
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid;
+}
+
+.subjectCard {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.subjectCard label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+
+.subjectCard input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.subjectCard input:focus {
+  outline: none;
+  border-color: #E31837;
+}
+
+.subjectCard input:disabled {
+  background: #f8fafc;
+  cursor: not-allowed;
+}
+
+.audioPreview {
+  width: 100%;
+}
+
+.audioPreview audio {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.audioActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.recordingIndicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #E31837;
+  display: inline-block;
+  margin-right: 0.5rem;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
 }
