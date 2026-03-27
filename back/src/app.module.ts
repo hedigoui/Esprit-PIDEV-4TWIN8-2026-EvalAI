@@ -14,15 +14,24 @@ import { GeminiModule } from './gemini/gemini.module'; // Add this
 
 @Module({
   imports: [
-    MongooseModule.forRoot('mongodb://localhost:27017/your-database-name'),
-    TypeOrmModule.forRoot({
-      type: 'mongodb',
-      host: 'localhost',
-      port: 27017,
-      database: 'evalAI',
-      entities: [Users, OralPerformance, OralEvaluation],
-      synchronize: true,
-    }),
+    // MongooseModule.forRoot('mongodb://localhost:27017/your-database-name'),
+    // TypeOrmModule.forRoot({
+    //   type: 'mongodb',
+    //   host: 'localhost',
+    //   port: 27017,
+    //   database: 'evalAI',
+    //   entities: [Users, OralPerformance, OralEvaluation],
+    //   synchronize: true,
+    // }),
+    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost:27017/your-database-name'),
+TypeOrmModule.forRoot({
+  type: 'mongodb',
+  host: process.env.MONGODB_HOST || 'localhost',
+  port: process.env.MONGODB_PORT ? parseInt(process.env.MONGODB_PORT) : 27017,
+  database: 'evalAI',
+  entities: [Users, OralPerformance, OralEvaluation],
+  synchronize: true,
+}),
     JwtModule.register({
       secret: 'your-secret-key-change-this-in-production',
       signOptions: { expiresIn: '1d' },
