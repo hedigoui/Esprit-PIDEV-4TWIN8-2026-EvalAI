@@ -63,6 +63,13 @@ const StudentSidebar = () => {
           <Settings size={20} />
           <span>Settings</span>
         </NavLink>
+        <NavLink 
+          to="/student/reclamations" 
+          className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}
+        >
+          <Settings size={20} />
+          <span>Reclamations</span>
+        </NavLink>
       </nav>
 
       <div className={styles.footer}>

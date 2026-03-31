@@ -10,7 +10,9 @@ import { OralPerformance } from './oral-performance/oral-performance.entity';
 import { EvaluationModule } from './evaluation/evaluation.module';
 import { OralEvaluation } from './evaluation/entities/oral-evaluation.entity';
 import { UsersModule } from './users/users.module';
-import { GeminiModule } from './gemini/gemini.module'; // Add this
+import { GeminiModule } from './gemini/gemini.module';
+import { ReclamationsModule } from './reclamations/reclamations.module';
+import { Reclamation } from './reclamations/reclamations.models';
 
 @Module({
   imports: [
@@ -29,7 +31,7 @@ TypeOrmModule.forRoot({
   host: process.env.MONGODB_HOST || 'localhost',
   port: process.env.MONGODB_PORT ? parseInt(process.env.MONGODB_PORT) : 27017,
   database: 'evalAI',
-  entities: [Users, OralPerformance, OralEvaluation],
+  entities: [Users, OralPerformance, OralEvaluation, Reclamation],
   synchronize: true,
 }),
     JwtModule.register({
@@ -40,7 +42,8 @@ TypeOrmModule.forRoot({
     OralPerformanceModule,
     EvaluationModule,
     UsersModule,
-    GeminiModule, // Add this
+    GeminiModule,
+    ReclamationsModule,
   ],
 })
 export class AppModule {}
