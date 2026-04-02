@@ -13,10 +13,10 @@ export class OAuthService {
   ) {}
 
   async validateOAuthUser(profile: any): Promise<any> {
-    const { email, firstName, lastName, provider } = profile;
-    
+    const { email, firstName, lastName, provider: _provider } = profile;
+
     let user = await this.userRepository.findOneBy({ email });
-    
+
     if (!user) {
       // Create new user if doesn't exist
       user = await this.userRepository.save({
@@ -30,21 +30,21 @@ export class OAuthService {
         updatedAt: new Date(),
       });
     }
-    
+
     return user;
   }
 
   async generateJWT(user: Users) {
-    const payload = { 
+    const payload = {
       sub: user._id.toString(),
       email: user.email,
       role: user.role,
       firstName: user.firstName,
-      lastName: user.lastName
+      lastName: user.lastName,
     };
 
     const access_token = this.jwtService.sign(payload);
-    
+
     return {
       access_token,
       user: {
@@ -53,8 +53,8 @@ export class OAuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
-        isActive: user.isActive
-      }
+        isActive: user.isActive,
+      },
     };
   }
 }

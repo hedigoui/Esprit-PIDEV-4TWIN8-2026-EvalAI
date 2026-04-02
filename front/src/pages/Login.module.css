@@ -149,11 +149,14 @@
   padding: 2rem;
   background: #fafafa;
   position: relative;
+  overflow-y: auto;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
 }
 
 .formWrapper {
   width: 100%;
   max-width: 420px;
+  animation: fadeUp 0.5s ease-out;
 }
 
 .formHeader {
@@ -415,10 +418,12 @@
   color: #E31837;
   text-decoration: none;
   font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .signupLink a:hover {
   text-decoration: underline;
+  transform: translateX(2px);
 }
 
 /* ===== FOOTER ===== */
@@ -482,21 +487,7 @@
     flex-direction: column;
   }
 }
-/* Ajoutez ces classes d'animation à la fin de votre fichier CSS */
-
-.rightPanel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background: white;
-  padding: 2rem;
-  position: relative;
-  overflow-y: auto;
-  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-}
-
+/* ===== ANIMATIONS ===== */
 .fadeIn {
   opacity: 1;
   transform: translateX(0);
@@ -520,13 +511,6 @@
   }
 }
 
-/* Optionnel: animation de slide pour le contenu du formulaire */
-.formWrapper {
-  width: 100%;
-  max-width: 400px;
-  animation: fadeUp 0.5s ease-out;
-}
-
 @keyframes fadeUp {
   from {
     opacity: 0;
@@ -536,14 +520,4 @@
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-/* Animation pour le bouton de navigation */
-.signupLink a {
-  transition: all 0.2s ease;
-}
-
-.signupLink a:hover {
-  color: #E31837;
-  transform: translateX(2px);
 }

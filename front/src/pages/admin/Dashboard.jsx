@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
 import { Users, GraduationCap, User, Activity, TrendingUp, ArrowUpRight, Shield, Settings, Bell, LogOut } from 'lucide-react';

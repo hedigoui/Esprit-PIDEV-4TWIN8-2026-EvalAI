@@ -5,10 +5,21 @@ import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { CommunicationModule } from './communication/communication.module';
+import { ReclamationsModule } from './reclamations/reclamations.module';
+import { EvaluationModule } from './evaluation/evaluation.module';
+import { OralPerformanceModule } from './oral-performance/oral-performance.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { Users } from './users/users.models';
-import { Message, Conversation, Appointment, Notification } from './communication/communication.models';
+import { Reclamation } from './reclamations/reclamations.models';
+import { OralPerformance } from './oral-performance/oral-performance.entity';
+import { OralEvaluation } from './evaluation/entities/oral-evaluation.entity';
+import {
+  Message,
+  Conversation,
+  Appointment,
+  Notification,
+} from './communication/communication.models';
 
 @Module({
   imports: [
@@ -20,16 +31,28 @@ import { Message, Conversation, Appointment, Notification } from './communicatio
       host: 'localhost',
       port: 27017,
       database: 'evalAI',
-      entities: [Users, Message, Conversation, Appointment, Notification],
-      synchronize: true, // À utiliser uniquement en développement
+      entities: [
+        Users,
+        Message,
+        Conversation,
+        Appointment,
+        Notification,
+        Reclamation,
+        OralPerformance,
+        OralEvaluation,
+      ],
+      synchronize: true,
     }),
     JwtModule.register({
-      secret: 'your-secret-key-change-this-in-production', // Use environment variable in production
+      secret: 'your-secret-key-change-this-in-production',
       signOptions: { expiresIn: '1d' },
     }),
     UsersModule,
     AuthModule,
     CommunicationModule,
+    ReclamationsModule,
+    EvaluationModule,
+    OralPerformanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

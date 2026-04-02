@@ -71,6 +71,13 @@ const AdminSidebar = () => {
           <MessageCircle size={20} />
           <span>Messages</span>
         </NavLink>
+        <NavLink 
+          to="/admin/reclamations" 
+          className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}
+        >
+          <Users size={20} />
+          <span>Reclamations</span>
+        </NavLink>
         
         <NavLink 
           to="/admin/settings" 

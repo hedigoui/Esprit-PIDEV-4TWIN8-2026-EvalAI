@@ -160,6 +160,45 @@ const Reports = () => {
               </div>
             </div>
           </div>
+
+          {/* Recent instructor evaluations */}
+          <div style={{
+            background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem',
+          }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e', marginBottom: '0.75rem' }}>
+              Recent evaluations
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {evaluations.map((ev) => (
+                <div
+                  key={ev.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '0.65rem 0.85rem', borderRadius: '12px',
+                    background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <div style={{
+                      width: '36px', height: '36px', borderRadius: '10px',
+                      background: `${ev.color}22`, color: ev.color,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.72rem', fontWeight: '700',
+                    }}>{ev.initials}</div>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#1a1a2e' }}>{ev.instructor}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{ev.date}</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: '800', color: '#1a1a2e' }}>{ev.score}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b' }}>{ev.level}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </main>
       </div>
     </div>

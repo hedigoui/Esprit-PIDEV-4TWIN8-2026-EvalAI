@@ -79,7 +79,14 @@ const TeacherSidebar = () => {
           <MessageCircle size={20} />
           <span>Messages</span>
         </NavLink>
-        
+         <NavLink 
+                  to="/Teacher/reclamations" 
+                  className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}
+                >
+                  <Users size={20} />
+                  <span>Reclamations</span>
+                </NavLink>
+                
         <NavLink 
           to="/teacher/settings" 
           className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}

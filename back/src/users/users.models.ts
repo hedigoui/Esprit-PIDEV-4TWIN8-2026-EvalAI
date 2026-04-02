@@ -1,9 +1,4 @@
-import {
-  Column,
-  Entity,
-  ObjectId,
-  ObjectIdColumn,
-} from 'typeorm';
+import { Column, Entity, ObjectId, ObjectIdColumn } from 'typeorm';
 
 export enum UserRole {
   STUDENT = 'student',

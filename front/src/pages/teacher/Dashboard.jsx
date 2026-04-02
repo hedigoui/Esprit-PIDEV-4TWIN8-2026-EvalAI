@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import TeacherSidebar from '../../components/TeacherSidebar';
 import { Users, ClipboardCheck, Clock, TrendingUp, Calendar, Mic, ArrowUpRight, Search, MoreHorizontal, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, CartesianGrid } from 'recharts';

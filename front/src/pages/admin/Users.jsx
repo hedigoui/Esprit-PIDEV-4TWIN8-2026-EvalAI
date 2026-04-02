@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
 import { Search, Plus, Edit2, Trash2, Filter, Power, PowerOff, X, User, Mail, Lock } from 'lucide-react';
@@ -30,39 +30,7 @@ const Users = () => {
   const [addingUser, setAddingUser] = useState(false);
   const [addError, setAddError] = useState('');
 
-  // Check authentication on component mount
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
-    
-    if (!token) {
-      navigate('/', { replace: true });
-      return;
-    }
-
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        if (user.role !== 'admin') {
-          if (user.role === 'instructor') {
-            navigate('/teacher/dashboard', { replace: true });
-          } else if (user.role === 'student') {
-            navigate('/student/dashboard', { replace: true });
-          }
-          return;
-        }
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        navigate('/', { replace: true });
-        return;
-      }
-    }
-
-    fetchUsers();
-  }, [navigate]);
-
-  // Fetch users from backend
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token'); // FIXED: Changed from 'access_token' to 'token'
@@ -114,7 +82,37 @@ const Users = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+
+    if (!token) {
+      navigate('/', { replace: true });
+      return;
+    }
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.role !== 'admin') {
+          if (user.role === 'instructor') {
+            navigate('/teacher/dashboard', { replace: true });
+          } else if (user.role === 'student') {
+            navigate('/student/dashboard', { replace: true });
+          }
+          return;
+        }
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        navigate('/', { replace: true });
+        return;
+      }
+    }
+
+    void fetchUsers();
+  }, [navigate, fetchUsers]);
 
   // Delete user
   const handleDeleteUser = async (userId) => {

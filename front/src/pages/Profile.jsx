@@ -523,14 +523,13 @@ const Profile = () => {
                     {/* Email */}
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={{ 
-                        display: 'block', 
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
                         color: 'var(--text-primary)', 
                         fontSize: '0.9rem', 
                         fontWeight: '500',
                         marginBottom: '0.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
                       }}>
                         <Mail size={16} style={{ color: 'var(--text-secondary)' }} />
                         Email Address
@@ -561,14 +560,13 @@ const Profile = () => {
                     {/* Phone */}
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={{ 
-                        display: 'block', 
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
                         color: 'var(--text-primary)', 
                         fontSize: '0.9rem', 
                         fontWeight: '500',
                         marginBottom: '0.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
                       }}>
                         <Phone size={16} style={{ color: 'var(--text-secondary)' }} />
                         Phone Number

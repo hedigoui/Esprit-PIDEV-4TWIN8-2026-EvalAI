@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, MessageCircle, Phone, Video, MoreVertical, User } from 'lucide-react';
 import TeacherSidebar from '../components/TeacherSidebar';
@@ -28,10 +28,7 @@ const Conversations = () => {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const loadConversationsRef = useRef(null);
-
-  // Define loadConversations function
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -68,10 +65,7 @@ const Conversations = () => {
       console.error('Error loading conversations:', error);
       setConversations([]);
     }
-  };
-
-  // Store loadConversations in ref to access in useEffect
-  loadConversationsRef.current = loadConversations;
+  }, [user]);
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user') || '{}');
@@ -82,21 +76,19 @@ const Conversations = () => {
       return;
     }
     setLoading(false);
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (user && user.id) {
-      loadConversations();
-      
-      // Set up polling to check for new conversations every 3 seconds
+      void loadConversations();
+
       const intervalId = setInterval(() => {
-        loadConversationsRef.current?.();
+        void loadConversations();
       }, 3000);
-      
-      // Clean up interval when component unmounts or user changes
+
       return () => clearInterval(intervalId);
     }
-  }, [user?.id]);
+  }, [user, loadConversations]);
 
   const filteredConversations = conversations.filter(conv => {
     if (!searchTerm) return true;
@@ -225,13 +217,13 @@ const Conversations = () => {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {filteredConversations.map((conversation) => {
+                {filteredConversations.map((conversation, index) => {
                   // Use the otherParticipant data from backend
                   const otherParticipant = conversation.otherParticipant;
                   
                   return (
                   <div
-                    key={conversation._id || conversation.id || `conversation-${Math.random()}`}
+                    key={String(conversation._id ?? conversation.id ?? index)}
                     onClick={() => {
                       if (otherParticipant?.id) {
                         navigate(`/messages/${otherParticipant.id}`);
@@ -276,7 +268,6 @@ const Conversations = () => {
                         </h3>
                         <span style={{
                           fontSize: '0.75rem',
-                          color: 'var(--text-secondary)',
                           background: 'rgba(227, 24, 55, 0.1)',
                           color: '#E31837',
                           padding: '0.25rem 0.75rem',

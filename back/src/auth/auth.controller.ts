@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Req, Res, HttpStatus } from '@nestjs/common';
+import { Controller, Get, UseGuards, Req, Res } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import { OAuthService } from './oauth.service';
@@ -19,13 +19,13 @@ export class AuthController {
     try {
       const user = await this.oauthService.validateOAuthUser(req.user);
       const jwtResponse = await this.oauthService.generateJWT(user);
-      
+
       // Redirect to frontend with token
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(jwtResponse.user))}`;
-      
+
       return res.redirect(redirectUrl);
-    } catch (error) {
+    } catch (_error) {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       return res.redirect(`${frontendUrl}/login?error=auth_failed`);
     }
@@ -43,13 +43,13 @@ export class AuthController {
     try {
       const user = await this.oauthService.validateOAuthUser(req.user);
       const jwtResponse = await this.oauthService.generateJWT(user);
-      
+
       // Redirect to frontend with token
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(jwtResponse.user))}`;
-      
+
       return res.redirect(redirectUrl);
-    } catch (error) {
+    } catch (_error) {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       return res.redirect(`${frontendUrl}/login?error=auth_failed`);
     }

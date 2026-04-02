@@ -41,7 +41,7 @@ const AuthCallback = () => {
             navigate('/dashboard');
           }
         }, 100);
-      } catch (err) {
+      } catch {
         setError('Invalid authentication data');
         setLoading(false);
         setTimeout(() => {

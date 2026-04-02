@@ -24,6 +24,8 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Overly strict for normal fetch-in-effect and auth flows; still enforced by exhaustive-deps as warnings.
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
 ])

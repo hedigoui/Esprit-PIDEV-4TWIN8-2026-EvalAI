@@ -1,7 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MongoRepository } from 'typeorm';
-import { Message, Conversation, Notification, Appointment, MessageType, MessageStatus } from './communication.models';
+import {
+  Message,
+  Conversation,
+  Notification,
+  Appointment,
+  MessageType,
+  MessageStatus,
+} from './communication.models';
 import { Users } from '../users/users.models';
 import { ObjectId } from 'mongodb';
 
@@ -22,11 +33,16 @@ export class CommunicationService {
 
   // ===== MESSAGING SYSTEM =====
 
-  async sendMessage(senderId: string, receiverId: string, content: string, type: MessageType = MessageType.TEXT): Promise<Message> {
+  async sendMessage(
+    senderId: string,
+    receiverId: string,
+    content: string,
+    type: MessageType = MessageType.TEXT,
+  ): Promise<Message> {
     try {
       // Find or create conversation
       let conversation = await this.findConversation(senderId, receiverId);
-      
+
       if (!conversation) {
         conversation = await this.createConversation(senderId, receiverId);
       }
@@ -39,17 +55,17 @@ export class CommunicationService {
         senderId,
         receiverId,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
       const savedMessage = await this.messageRepository.save(message);
-      
+
       // Update conversation
       conversation.lastMessageContent = content;
       conversation.lastMessageTime = new Date();
       conversation.updatedAt = new Date();
       await this.conversationRepository.save(conversation);
-      
+
       return savedMessage;
     } catch (error) {
       console.error('Error sending message:', error);
@@ -57,15 +73,19 @@ export class CommunicationService {
     }
   }
 
-  async getConversationMessages(userId1: string, userId2: string, limit: number = 50): Promise<Message[]> {
+  async getConversationMessages(
+    userId1: string,
+    userId2: string,
+    limit: number = 50,
+  ): Promise<Message[]> {
     try {
       // Always query for messages between the two users
       const messages = await this.messageRepository.find({
         where: {
           $or: [
             { senderId: userId1, receiverId: userId2 },
-            { senderId: userId2, receiverId: userId1 }
-          ]
+            { senderId: userId2, receiverId: userId1 },
+          ],
         },
         order: { createdAt: -1 },
         take: limit,
@@ -83,23 +103,25 @@ export class CommunicationService {
       const conversations = await this.conversationRepository.find({
         where: {
           participantIds: { $in: [userId] },
-          isActive: true
+          isActive: true,
         },
-        order: { lastMessageTime: -1 }
+        order: { lastMessageTime: -1 },
       });
-      
+
       // Enrich conversations with user details
       const enrichedConversations = await Promise.all(
         conversations.map(async (conv) => {
           // Get the other participant ID
-          const otherParticipantId = conv.participantIds.find(id => id !== userId);
-          
+          const otherParticipantId = conv.participantIds.find(
+            (id) => id !== userId,
+          );
+
           // Fetch other user details
           let otherParticipant: any = null;
           if (otherParticipantId) {
             try {
               const otherUser = await this.userRepository.findOne({
-                where: { _id: new ObjectId(otherParticipantId) }
+                where: { _id: new ObjectId(otherParticipantId) },
               });
               if (otherUser) {
                 otherParticipant = {
@@ -109,25 +131,27 @@ export class CommunicationService {
                   email: otherUser.email,
                   role: otherUser.role,
                   avatar: otherUser.avatar,
-                  name: `${otherUser.firstName} ${otherUser.lastName}`.trim() || otherUser.email
+                  name:
+                    `${otherUser.firstName} ${otherUser.lastName}`.trim() ||
+                    otherUser.email,
                 };
               }
             } catch (err) {
               // Could not fetch user details
             }
           }
-          
+
           return {
             ...conv,
             otherParticipant: otherParticipant || {
               id: otherParticipantId,
               name: 'Unknown User',
-              role: 'user'
-            }
+              role: 'user',
+            },
           };
-        })
+        }),
       );
-      
+
       return enrichedConversations;
     } catch (error) {
       console.error('Error getting user conversations:', error);
@@ -135,25 +159,30 @@ export class CommunicationService {
     }
   }
 
-  private async findConversation(userId1: string, userId2: string): Promise<Conversation | null> {
+  private async findConversation(
+    userId1: string,
+    userId2: string,
+  ): Promise<Conversation | null> {
     try {
       // Find all active conversations for the first user
       const conversations = await this.conversationRepository.find({
         where: {
           participantIds: { $in: [userId1] },
-          isActive: true
-        }
+          isActive: true,
+        },
       });
-      
+
       // Find the one that also contains the second user
-      const conversation = conversations.find(conv => 
-        conv.participantIds.includes(userId1) && conv.participantIds.includes(userId2)
+      const conversation = conversations.find(
+        (conv) =>
+          conv.participantIds.includes(userId1) &&
+          conv.participantIds.includes(userId2),
       );
-      
+
       if (conversation) {
         return conversation;
       }
-      
+
       return null;
     } catch (error) {
       console.error('Error finding conversation:', error);
@@ -161,14 +190,17 @@ export class CommunicationService {
     }
   }
 
-  private async createConversation(userId1: string, userId2: string): Promise<Conversation> {
+  private async createConversation(
+    userId1: string,
+    userId2: string,
+  ): Promise<Conversation> {
     const conversation = this.conversationRepository.create({
       participantIds: [userId1, userId2],
       isActive: true,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
-    
+
     return await this.conversationRepository.save(conversation);
   }
 
@@ -177,9 +209,9 @@ export class CommunicationService {
   async getUserById(userId: string): Promise<any | null> {
     try {
       const user = await this.userRepository.findOne({
-        where: { _id: new ObjectId(userId) }
+        where: { _id: new ObjectId(userId) },
       });
-      
+
       if (user) {
         return {
           id: userId,
@@ -188,7 +220,7 @@ export class CommunicationService {
           email: user.email,
           role: user.role,
           avatar: user.avatar,
-          name: `${user.firstName} ${user.lastName}`.trim() || user.email
+          name: `${user.firstName} ${user.lastName}`.trim() || user.email,
         };
       }
       return null;
@@ -219,7 +251,7 @@ export class CommunicationService {
     try {
       await this.notificationRepository.updateMany(
         { _id: new ObjectId(notificationId) },
-        { status: 'read', updatedAt: new Date() }
+        { status: 'read', updatedAt: new Date() },
       );
     } catch (error) {
       console.error('❌ Error marking notification as read:', error);
@@ -231,7 +263,7 @@ export class CommunicationService {
     try {
       await this.notificationRepository.updateMany(
         { userId, status: 'unread' },
-        { status: 'read', updatedAt: new Date() }
+        { status: 'read', updatedAt: new Date() },
       );
     } catch (error) {
       console.error('❌ Error marking all notifications as read:', error);
@@ -239,7 +271,13 @@ export class CommunicationService {
     }
   }
 
-  private async createNotification(userId: string, title: string, message: string, relatedEntityId?: string, relatedEntityType?: 'message' | 'appointment' | 'feedback' | 'announcement'): Promise<Notification | null> {
+  private async createNotification(
+    userId: string,
+    title: string,
+    message: string,
+    relatedEntityId?: string,
+    relatedEntityType?: 'message' | 'appointment' | 'feedback' | 'announcement',
+  ): Promise<Notification | null> {
     try {
       const notification = {
         userId,
@@ -249,7 +287,7 @@ export class CommunicationService {
         relatedEntityType,
         status: 'unread' as const,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
       return await this.notificationRepository.save(notification);
@@ -261,7 +299,14 @@ export class CommunicationService {
 
   // ===== APPOINTMENT SYSTEM =====
 
-  async createAppointment(teacherId: string, studentId: string, title: string, scheduledTime: Date, endTime: Date, description?: string): Promise<Appointment> {
+  async createAppointment(
+    teacherId: string,
+    studentId: string,
+    title: string,
+    scheduledTime: Date,
+    endTime: Date,
+    description?: string,
+  ): Promise<Appointment> {
     try {
       const appointment = this.appointmentRepository.create({
         title,
@@ -272,11 +317,12 @@ export class CommunicationService {
         studentId,
         status: 'scheduled',
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
-      const savedAppointment = await this.appointmentRepository.save(appointment);
-      
+      const savedAppointment =
+        await this.appointmentRepository.save(appointment);
+
       console.log('✅ Appointment created successfully');
       return savedAppointment;
     } catch (error) {
@@ -289,10 +335,7 @@ export class CommunicationService {
     try {
       const appointments = await this.appointmentRepository.find({
         where: {
-          $or: [
-            { teacherId: userId },
-            { studentId: userId }
-          ]
+          $or: [{ teacherId: userId }, { studentId: userId }],
         },
         order: { scheduledTime: 1 },
       });
@@ -304,24 +347,36 @@ export class CommunicationService {
     }
   }
 
-  async updateAppointment(appointmentId: string, userId: string, status: 'confirmed' | 'completed' | 'cancelled'): Promise<Appointment> {
+  async updateAppointment(
+    appointmentId: string,
+    userId: string,
+    status: 'confirmed' | 'completed' | 'cancelled',
+  ): Promise<Appointment> {
     try {
-      const appointment = await this.appointmentRepository.findOneBy({ _id: new ObjectId(appointmentId) });
-      
+      const appointment = await this.appointmentRepository.findOneBy({
+        _id: new ObjectId(appointmentId),
+      });
+
       if (!appointment) {
         throw new NotFoundException('Appointment not found');
       }
 
       // Check if user has permission to update
-      if (appointment.teacherId !== userId && appointment.studentId !== userId) {
-        throw new BadRequestException('Unauthorized to update this appointment');
+      if (
+        appointment.teacherId !== userId &&
+        appointment.studentId !== userId
+      ) {
+        throw new BadRequestException(
+          'Unauthorized to update this appointment',
+        );
       }
 
       appointment.status = status;
       appointment.updatedAt = new Date();
-      
-      const updatedAppointment = await this.appointmentRepository.save(appointment);
-      
+
+      const updatedAppointment =
+        await this.appointmentRepository.save(appointment);
+
       console.log(`✅ Appointment ${status} successfully`);
       return updatedAppointment;
     } catch (error) {
@@ -330,21 +385,31 @@ export class CommunicationService {
     }
   }
 
-  async deleteAppointment(appointmentId: string, userId: string): Promise<void> {
+  async deleteAppointment(
+    appointmentId: string,
+    userId: string,
+  ): Promise<void> {
     try {
-      const appointment = await this.appointmentRepository.findOneBy({ _id: new ObjectId(appointmentId) });
-      
+      const appointment = await this.appointmentRepository.findOneBy({
+        _id: new ObjectId(appointmentId),
+      });
+
       if (!appointment) {
         throw new NotFoundException('Appointment not found');
       }
 
       // Check if user has permission to delete
-      if (appointment.teacherId !== userId && appointment.studentId !== userId) {
-        throw new BadRequestException('Unauthorized to delete this appointment');
+      if (
+        appointment.teacherId !== userId &&
+        appointment.studentId !== userId
+      ) {
+        throw new BadRequestException(
+          'Unauthorized to delete this appointment',
+        );
       }
 
       await this.appointmentRepository.delete(appointmentId);
-      
+
       console.log('✅ Appointment deleted successfully');
     } catch (error) {
       console.error('❌ Error deleting appointment:', error);

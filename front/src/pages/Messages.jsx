@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Send, Paperclip, Mic, Phone, Video, MoreVertical } from 'lucide-react';
 import styles from '../styles/shared.module.css';
@@ -32,10 +32,7 @@ const Messages = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
-  const loadMessagesRef = useRef(null);
-
-  // Define loadMessages function
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -64,10 +61,7 @@ const Messages = () => {
       console.error('Error loading messages:', error);
       setMessages([]);
     }
-  };
-
-  // Store loadMessages in ref to access in useEffect
-  loadMessagesRef.current = loadMessages;
+  }, [userId]);
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user') || '{}');
@@ -78,21 +72,19 @@ const Messages = () => {
       return;
     }
     setLoading(false);
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (userId && user && user.id) {
-      loadMessages();
-      
-      // Set up polling to check for new messages every 3 seconds
+      void loadMessages();
+
       const intervalId = setInterval(() => {
-        loadMessagesRef.current?.();
+        void loadMessages();
       }, 3000);
-      
-      // Clean up interval when component unmounts or userId changes
+
       return () => clearInterval(intervalId);
     }
-  }, [userId, user?.id]);
+  }, [userId, user, loadMessages]);
 
   useEffect(() => {
     scrollToBottom();

@@ -8,8 +8,11 @@ export class EmailService {
   constructor() {
     console.log('Initializing EmailService...');
     console.log('EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Not set');
-    console.log('EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? 'Set' : 'Not set');
-    
+    console.log(
+      'EMAIL_PASSWORD:',
+      process.env.EMAIL_PASSWORD ? 'Set' : 'Not set',
+    );
+
     // Configure your email transporter
     this.transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
@@ -20,12 +23,12 @@ export class EmailService {
         pass: process.env.EMAIL_PASSWORD,
       },
       tls: {
-        rejectUnauthorized: false
-      }
+        rejectUnauthorized: false,
+      },
     });
 
     // Verify connection configuration
-    this.transporter.verify((error, success) => {
+    this.transporter.verify((error, _success) => {
       if (error) {
         console.error('Email transporter verification failed:', error);
       } else {
@@ -36,7 +39,7 @@ export class EmailService {
 
   async sendWelcomeEmail(email: string, name: string): Promise<void> {
     console.log(`Attempting to send welcome email to ${email} for ${name}`);
-    
+
     const mailOptions = {
       from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -80,19 +83,25 @@ export class EmailService {
       console.error(`❌ Failed to send welcome email to ${email}:`, {
         message: error.message,
         code: error.code,
-        command: error.command
+        command: error.command,
       });
     }
   }
 
-  async sendStatusChangeEmail(email: string, name: string, isActive: boolean): Promise<void> {
+  async sendStatusChangeEmail(
+    email: string,
+    name: string,
+    isActive: boolean,
+  ): Promise<void> {
     const status = isActive ? 'activated' : 'deactivated';
     const statusColor = isActive ? '#22c55e' : '#ef4444';
     const backgroundColor = isActive ? '#e8f5e9' : '#ffebee';
     const borderColor = isActive ? '#22c55e' : '#ef4444';
-    
-    console.log(`Attempting to send status change email to ${email} for ${name} - Status: ${status}`);
-    
+
+    console.log(
+      `Attempting to send status change email to ${email} for ${name} - Status: ${status}`,
+    );
+
     const mailOptions = {
       from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -114,9 +123,10 @@ export class EmailService {
           
           <div style="background: ${backgroundColor}; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ${borderColor};">
             <p style="margin: 0; color: #333; font-size: 16px; line-height: 1.6;">
-              ${isActive 
-                ? '✨ <strong style="color: #22c55e;">Good news!</strong> Your account is now active. You can log in and start using all the features of our platform.' 
-                : '⚠️ <strong style="color: #ef4444;">Important:</strong> Your account has been deactivated. If you believe this is a mistake, please contact our support team.'
+              ${
+                isActive
+                  ? '✨ <strong style="color: #22c55e;">Good news!</strong> Your account is now active. You can log in and start using all the features of our platform.'
+                  : '⚠️ <strong style="color: #ef4444;">Important:</strong> Your account has been deactivated. If you believe this is a mistake, please contact our support team.'
               }
             </p>
           </div>
@@ -136,14 +146,20 @@ export class EmailService {
       console.error(`❌ Failed to send status change email to ${email}:`, {
         message: error.message,
         code: error.code,
-        command: error.command
+        command: error.command,
       });
     }
   }
 
-  async sendPasswordResetEmail(email: string, name: string, resetUrl: string): Promise<void> {
-    console.log(`Attempting to send password reset email to ${email} for ${name}`);
-    
+  async sendPasswordResetEmail(
+    email: string,
+    name: string,
+    resetUrl: string,
+  ): Promise<void> {
+    console.log(
+      `Attempting to send password reset email to ${email} for ${name}`,
+    );
+
     const mailOptions = {
       from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -199,16 +215,22 @@ export class EmailService {
       console.error(`❌ Failed to send password reset email to ${email}:`, {
         message: error.message,
         code: error.code,
-        command: error.command
+        command: error.command,
       });
     }
   }
 
-  async sendNewPasswordEmail(email: string, name: string, newPassword: string): Promise<void> {
-    console.log(`Attempting to send new password email to ${email} for ${name}`);
-    
+  async sendNewPasswordEmail(
+    email: string,
+    name: string,
+    newPassword: string,
+  ): Promise<void> {
+    console.log(
+      `Attempting to send new password email to ${email} for ${name}`,
+    );
+
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    
+
     const mailOptions = {
       from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -272,7 +294,7 @@ export class EmailService {
       console.error(`❌ Failed to send new password email to ${email}:`, {
         message: error.message,
         code: error.code,
-        command: error.command
+        command: error.command,
       });
     }
   }

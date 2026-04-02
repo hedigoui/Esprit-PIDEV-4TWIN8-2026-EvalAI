@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { UserRole } from './users.models';
-import type { Multer } from 'multer';
+import type { Express } from 'express';
 
 @Controller('users')
 export class UsersController {
@@ -35,10 +35,16 @@ export class UsersController {
   ) {
     try {
       // Validate required fields
-      if (!body.email || !body.password || !body.firstName || !body.lastName || !body.role) {
+      if (
+        !body.email ||
+        !body.password ||
+        !body.firstName ||
+        !body.lastName ||
+        !body.role
+      ) {
         throw new BadRequestException('Missing required fields');
       }
-      
+
       return await this.usersService.create(body);
     } catch (error) {
       console.error('Controller error:', error);
@@ -59,7 +65,7 @@ export class UsersController {
       console.log(`🔍 Controller: Returning ${students.length} students`);
       return {
         success: true,
-        data: students
+        data: students,
       };
     } catch (error) {
       console.error('Error getting students:', error);
@@ -81,7 +87,7 @@ export class UsersController {
       if (!body.email || !body.password) {
         throw new BadRequestException('Email and password are required');
       }
-      
+
       return await this.usersService.signin(body.email, body.password);
     } catch (error) {
       console.error('Signin error:', error);
@@ -101,7 +107,7 @@ export class UsersController {
       if (!body.email) {
         throw new BadRequestException('Email is required');
       }
-      
+
       return await this.usersService.forgotPassword(body.email);
     } catch (error) {
       console.error('Forgot password error:', error);
@@ -121,13 +127,15 @@ export class UsersController {
   ) {
     try {
       if (!body.userId || !body.currentPassword || !body.newPassword) {
-        throw new BadRequestException('User ID, current password, and new password are required');
+        throw new BadRequestException(
+          'User ID, current password, and new password are required',
+        );
       }
-      
+
       return await this.usersService.changePassword(
         body.userId,
         body.currentPassword,
-        body.newPassword
+        body.newPassword,
       );
     } catch (error) {
       console.error('Change password error:', error);
@@ -143,7 +151,8 @@ export class UsersController {
   @Patch('profile/:id')
   updateProfile(
     @Param('id') id: string,
-    @Body() body: {
+    @Body()
+    body: {
       firstName?: string;
       lastName?: string;
       email?: string;
@@ -159,7 +168,7 @@ export class UsersController {
   @UseInterceptors(FileInterceptor('avatar'))
   uploadAvatar(
     @Param('id') id: string,
-    @UploadedFile() file: Multer.File,
+    @UploadedFile() file: Express.Multer.File,
   ) {
     return this.usersService.uploadAvatar(id, file);
   }
@@ -171,10 +180,7 @@ export class UsersController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
+  update(@Param('id') id: string, @Body() body: any) {
     return this.usersService.update(id, body);
   }
 

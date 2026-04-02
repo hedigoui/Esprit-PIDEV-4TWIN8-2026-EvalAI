@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Patch,
-  Delete,
   Body,
   Param,
   Query,
@@ -17,7 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CommunicationService } from './communication.service';
 import { MessageType } from './communication.models';
-import type { Multer } from 'multer';
+import type { Express } from 'express';
 import { extractUserFromToken } from '../auth/jwt.util';
 
 @Controller('communication')
@@ -29,7 +28,8 @@ export class CommunicationController {
   @Post('messages')
   @HttpCode(HttpStatus.CREATED)
   async sendMessage(
-    @Body() body: {
+    @Body()
+    body: {
       receiverId: string;
       content: string;
       type?: MessageType;
@@ -69,14 +69,14 @@ export class CommunicationController {
       // Get the actual user ID from the JWT token
       const user = extractUserFromToken(req);
       const currentUserId = user?.sub || 'temp-current-user-id';
-      
+
       // Get messages
       const messages = await this.communicationService.getConversationMessages(
         currentUserId,
         userId,
         limit ? parseInt(limit) : 50,
       );
-      
+
       // Get other user details
       const otherUser = await this.communicationService.getUserById(userId);
 
@@ -86,8 +86,8 @@ export class CommunicationController {
         otherUser: otherUser || {
           id: userId,
           name: 'Unknown User',
-          role: 'user'
-        }
+          role: 'user',
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -100,7 +100,8 @@ export class CommunicationController {
       // Get the actual user ID from the JWT token
       const user = extractUserFromToken(req);
       const userId = user?.sub || 'temp-current-user-id';
-      const conversations = await this.communicationService.getUserConversations(userId);
+      const conversations =
+        await this.communicationService.getUserConversations(userId);
 
       return {
         success: true,
@@ -114,8 +115,9 @@ export class CommunicationController {
   @Post('messages/upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFileMessage(
-    @UploadedFile() file: Multer.File,
-    @Body() body: {
+    @UploadedFile() file: Express.Multer.File,
+    @Body()
+    body: {
       receiverId: string;
       content: string;
     },
@@ -130,7 +132,7 @@ export class CommunicationController {
 
       // For now, store file info as base64
       // In production, you'd want to upload to cloud storage
-      const fileData = {
+      const _fileData = {
         filename: file.originalname,
         mimetype: file.mimetype,
         size: file.size,
@@ -162,7 +164,8 @@ export class CommunicationController {
   @Post('appointments')
   @HttpCode(HttpStatus.CREATED)
   async createAppointment(
-    @Body() body: {
+    @Body()
+    body: {
       teacherId: string;
       studentId: string;
       title: string;
@@ -172,7 +175,14 @@ export class CommunicationController {
     },
   ) {
     try {
-      const { teacherId, studentId, title, scheduledTime, endTime, description } = body;
+      const {
+        teacherId,
+        studentId,
+        title,
+        scheduledTime,
+        endTime,
+        description,
+      } = body;
 
       const appointment = await this.communicationService.createAppointment(
         teacherId,
@@ -198,9 +208,10 @@ export class CommunicationController {
     try {
       // TODO: Get userId and userRole from JWT token properly
       const userId = 'temp-user-id';
-      const userRole = 'instructor'; // TODO: Get from token
-      
-      const appointments = await this.communicationService.getAppointments(userId);
+      const _userRole = 'instructor'; // TODO: Get from token
+
+      const appointments =
+        await this.communicationService.getAppointments(userId);
 
       return {
         success: true,
@@ -240,13 +251,12 @@ export class CommunicationController {
   // ===== NOTIFICATION ENDPOINTS =====
 
   @Get('notifications')
-  async getNotifications(
-    @Query('unreadOnly') unreadOnly?: string,
-  ) {
+  async getNotifications(@Query('unreadOnly') _unreadOnly?: string) {
     try {
       // TODO: Get userId from JWT token properly
       const userId = 'temp-user-id';
-      const notifications = await this.communicationService.getNotifications(userId);
+      const notifications =
+        await this.communicationService.getNotifications(userId);
 
       return {
         success: true,
@@ -258,12 +268,10 @@ export class CommunicationController {
   }
 
   @Patch('notifications/:id/read')
-  async markNotificationAsRead(
-    @Param('id') id: string,
-  ) {
+  async markNotificationAsRead(@Param('id') id: string) {
     try {
       // TODO: Get userId from JWT token properly
-      const userId = 'temp-user-id';
+      const _userId = 'temp-user-id';
       await this.communicationService.markNotificationAsRead(id);
 
       return {
@@ -297,11 +305,11 @@ export class CommunicationController {
   async getTeacherStudents() {
     try {
       // TODO: Get teacherId from JWT token properly
-      const teacherId = 'temp-teacher-id';
-      
+      const _teacherId = 'temp-teacher-id';
+
       // This would typically get students assigned to this teacher
       // For now, we'll return all students (you might want to add a relationship)
-      
+
       return {
         success: true,
         message: 'Teacher students retrieved successfully',
@@ -316,10 +324,10 @@ export class CommunicationController {
   async getStudentTeachers() {
     try {
       // TODO: Get studentId from JWT token properly
-      const studentId = 'temp-student-id';
-      
+      const _studentId = 'temp-student-id';
+
       // This would typically get teachers assigned to this student
-      
+
       return {
         success: true,
         message: 'Student teachers retrieved successfully',
@@ -332,7 +340,8 @@ export class CommunicationController {
 
   @Post('feedback')
   async sendFeedback(
-    @Body() body: {
+    @Body()
+    body: {
       receiverId: string;
       feedback: string;
       type: 'positive' | 'constructive' | 'general';
@@ -342,7 +351,7 @@ export class CommunicationController {
     try {
       // TODO: Get senderId from JWT token properly
       const senderId = 'temp-sender-id';
-      const { receiverId, feedback, type, relatedTo } = body;
+      const { receiverId, feedback, type, relatedTo: _relatedTo } = body;
 
       // Send feedback as a special message type
       const message = await this.communicationService.sendMessage(
@@ -364,7 +373,8 @@ export class CommunicationController {
 
   @Post('announcements')
   async createAnnouncement(
-    @Body() body: {
+    @Body()
+    body: {
       title: string;
       content: string;
       targetRole?: 'student' | 'instructor' | 'all';
@@ -372,12 +382,16 @@ export class CommunicationController {
   ) {
     try {
       // TODO: Get senderId from JWT token properly
-      const senderId = 'temp-sender-id';
-      const { title, content, targetRole = 'all' } = body;
+      const _senderId = 'temp-sender-id';
+      const {
+        title: _title,
+        content: _content,
+        targetRole: _targetRole = 'all',
+      } = body;
 
       // This would typically send announcements to multiple users
       // For now, we'll create a notification
-      
+
       return {
         success: true,
         message: 'Announcement sent successfully',
