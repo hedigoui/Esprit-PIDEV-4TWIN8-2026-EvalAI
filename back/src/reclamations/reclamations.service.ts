@@ -9,13 +9,16 @@ import { MongoRepository } from 'typeorm';
 import { ObjectId } from 'mongodb';
 import { Reclamation, ReclamationStatus } from './reclamations.models';
 import { UserRole } from '../users/users.models';
+import { OralPerformance } from '../oral-performance/oral-performance.entity';
 
 type CreateReclamationInput = {
   title: string;
   description: string;
   category?: string;
-  studentName?: string; // Optional, can be derived from user data
-  studentId?: string; // For teacher creating reclamation
+  studentName?: string;
+  studentId?: string;
+  /** Optional: student’s instructor; otherwise inferred from latest oral performance */
+  targetInstructorId?: string;
 };
 
 type UpdateReclamationStatusInput = {
@@ -28,6 +31,8 @@ export class ReclamationsService {
   constructor(
     @InjectRepository(Reclamation)
     private readonly reclamationsRepo: MongoRepository<Reclamation>,
+    @InjectRepository(OralPerformance)
+    private readonly performanceRepo: MongoRepository<OralPerformance>,
   ) {}
 
   async create(
@@ -44,6 +49,15 @@ export class ReclamationsService {
     if (!description) throw new BadRequestException('Description is required');
     if (!studentName) throw new BadRequestException('Student name is required');
 
+    let targetInstructorId: string | undefined;
+    if (createdByRole === UserRole.STUDENT) {
+      const hint = input.targetInstructorId?.trim();
+      targetInstructorId =
+        hint ||
+        (await this.resolveInstructorIdForStudent(studentId)) ||
+        undefined;
+    }
+
     const now = new Date();
     const rec = this.reclamationsRepo.create({
       studentId,
@@ -53,7 +67,8 @@ export class ReclamationsService {
       category: input.category?.trim() || undefined,
       status: ReclamationStatus.OPEN,
       createdByRole,
-      createdById: createdById || studentId, // Teacher ID if by teacher, otherwise student ID
+      createdById: createdById || studentId,
+      targetInstructorId,
       createdAt: now,
       updatedAt: now,
     });
@@ -61,11 +76,71 @@ export class ReclamationsService {
     return await this.reclamationsRepo.save(rec);
   }
 
+  private async resolveInstructorIdForStudent(
+    studentId: string,
+  ): Promise<string | undefined> {
+    const performances = await this.performanceRepo.find({
+      where: { studentId: studentId as any },
+    });
+    const sorted = performances.sort(
+      (a, b) =>
+        (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0),
+    );
+    for (const p of sorted) {
+      const id = (p.instructorId || '').trim();
+      if (id && id !== 'unknown-instructor') return id;
+    }
+    return undefined;
+  }
+
+  /** Ticket from instructor to platform admins (studentId stores reporter id for uniqueness). */
+  async createInstructorToAdmin(
+    instructorId: string,
+    reporterDisplayName: string,
+    input: { title: string; description: string; category?: string },
+  ) {
+    return this.create(
+      instructorId,
+      {
+        title: input.title,
+        description: input.description,
+        category: input.category?.trim() || 'instructor_to_admin',
+        studentName: reporterDisplayName,
+      },
+      UserRole.INSTRUCTOR,
+      instructorId,
+    );
+  }
+
   async findMine(studentId: string) {
     const items = await this.reclamationsRepo.find({
       where: { studentId },
     });
     return items.sort(
+      (a, b) =>
+        (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0),
+    );
+  }
+
+  /** Student reclamations routed to this instructor + this instructor’s own tickets to admins. */
+  async findInstructorInbox(instructorId: string) {
+    const fromStudents = await this.reclamationsRepo.find({
+      where: {
+        targetInstructorId: instructorId,
+        createdByRole: UserRole.STUDENT,
+      } as any,
+    });
+    const ownToAdmin = await this.reclamationsRepo.find({
+      where: {
+        studentId: instructorId,
+        createdByRole: UserRole.INSTRUCTOR,
+      } as any,
+    });
+    const byId = new Map<string, Reclamation>();
+    for (const r of [...fromStudents, ...ownToAdmin]) {
+      byId.set(r._id.toString(), r);
+    }
+    return [...byId.values()].sort(
       (a, b) =>
         (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0),
     );
@@ -101,11 +176,14 @@ export class ReclamationsService {
 
     if (!rec) throw new NotFoundException('Reclamation not found');
 
-    const privileged =
-      params.requesterRole === UserRole.ADMIN ||
-      params.requesterRole === UserRole.INSTRUCTOR;
+    const isAdmin = params.requesterRole === UserRole.ADMIN;
+    const isOwner = rec.studentId === params.requesterId;
+    const isAssignedInstructor =
+      params.requesterRole === UserRole.INSTRUCTOR &&
+      rec.targetInstructorId === params.requesterId &&
+      rec.createdByRole === UserRole.STUDENT;
 
-    if (!privileged && rec.studentId !== params.requesterId) {
+    if (!isAdmin && !isOwner && !isAssignedInstructor) {
       throw new ForbiddenException('Access denied');
     }
 

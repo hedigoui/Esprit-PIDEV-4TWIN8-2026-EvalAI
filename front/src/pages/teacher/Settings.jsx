@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import TeacherSidebar from '../../components/TeacherSidebar';
-import { User, Bell, Lock, Volume2, Eye, EyeOff } from 'lucide-react';
+import { Bell, Lock, Volume2, Moon, Eye, EyeOff } from 'lucide-react';
 import styles from '../../styles/shared.module.css';
 import settingsStyles from '../student/Settings.module.css';
+import { getStoredTheme, setStoredTheme } from '../../theme';
 
 const Settings = () => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -15,6 +16,7 @@ const Settings = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [user, setUser] = useState(null);
+  const [darkMode, setDarkMode] = useState(() => getStoredTheme() === 'dark');
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -136,6 +138,32 @@ const Settings = () => {
                 </div>
                 <label className={settingsStyles.toggle}>
                   <input type="checkbox" />
+                  <span className={settingsStyles.slider}></span>
+                </label>
+              </div>
+            </div>
+
+            {/* Appearance */}
+            <div className={styles.card}>
+              <div className={settingsStyles.sectionHeader}>
+                <Moon size={20} />
+                <h3>Appearance</h3>
+              </div>
+              <div className={settingsStyles.toggleItem}>
+                <div>
+                  <h4>Dark mode</h4>
+                  <p>Use dark theme across the app</p>
+                </div>
+                <label className={settingsStyles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={darkMode}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setDarkMode(on);
+                      setStoredTheme(on ? 'dark' : 'light');
+                    }}
+                  />
                   <span className={settingsStyles.slider}></span>
                 </label>
               </div>

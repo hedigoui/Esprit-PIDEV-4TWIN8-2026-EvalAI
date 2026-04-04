@@ -34,7 +34,7 @@ export class OralPerformanceController {
   @Post()
   async create(@Body() createDto: CreateOralPerformanceDto) {
     try {
-      const instructorId = 'current-instructor-id';
+      const instructorId = createDto.instructorId || 'unknown-instructor';
       const performance = await this.oralPerformanceService.create(
         createDto,
         instructorId,

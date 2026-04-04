@@ -308,8 +308,8 @@ const Messages = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {messages.map((message) => {
-                  const currentUserId = user?.id || user?._id;
-                  const isSentByMe = message.senderId === currentUserId;
+                  const currentUserId = String(user?.id ?? user?._id ?? '');
+                  const isSentByMe = String(message.senderId ?? '') === currentUserId;
                   return (
                     <div
                       key={message._id || message.id}

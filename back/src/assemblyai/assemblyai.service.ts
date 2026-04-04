@@ -7,6 +7,7 @@ import { EvaluationResult, SpeechMetrics } from './interfaces/assemblyai.types';
 export class AssemblyAIService {
   private readonly logger = new Logger(AssemblyAIService.name);
   private client: AssemblyAI;
+  private readonly maxRetries = 3;
 
   constructor() {
     const apiKey = process.env.ASSEMBLYAI_API_KEY;
@@ -96,21 +97,72 @@ export class AssemblyAIService {
     };
   }
 
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private getNetworkErrorMessage(error: any): string {
+    const code = error?.cause?.code || error?.code;
+    if (code === 'ENOTFOUND') {
+      return 'Cannot resolve AssemblyAI host. Check DNS or internet connection.';
+    }
+    if (code === 'ECONNREFUSED') {
+      return 'Connection refused while contacting AssemblyAI.';
+    }
+    if (code === 'ECONNRESET') {
+      return 'Connection reset while contacting AssemblyAI.';
+    }
+    if (code === 'ETIMEDOUT') {
+      return 'Connection timed out while contacting AssemblyAI.';
+    }
+
+    return `AssemblyAI request failed${code ? ` (${code})` : ''}`;
+  }
+
+  private async transcribeWithRetry(audioBuffer: Buffer): Promise<any> {
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        this.logger.log(
+          `AssemblyAI transcription attempt ${attempt}/${this.maxRetries}`,
+        );
+
+        return await this.client.transcripts.transcribe({
+          audio: audioBuffer,
+          speech_models: ['universal'],
+          language_code: 'en_us',
+          language_detection: false,
+          speaker_labels: true,
+          sentiment_analysis: true,
+          auto_chapters: true,
+          entity_detection: true,
+        });
+      } catch (error) {
+        lastError = error;
+        const networkMessage = this.getNetworkErrorMessage(error);
+        this.logger.warn(`Attempt ${attempt} failed: ${networkMessage}`);
+
+        if (attempt < this.maxRetries) {
+          const delayMs = attempt * 1000;
+          this.logger.log(`Retrying AssemblyAI in ${delayMs}ms...`);
+          await this.sleep(delayMs);
+        }
+      }
+    }
+
+    const rootMessage = this.getNetworkErrorMessage(lastError);
+    throw new Error(
+      `${rootMessage}. Verify ASSEMBLYAI_API_KEY, internet access, and firewall/proxy settings.`,
+    );
+  }
+
   async evaluateAudio(audioBuffer: Buffer): Promise<EvaluationResult> {
     this.logger.log('========== STARTING ASSEMBLYAI EVALUATION ==========');
 
     try {
       // Force English language and disable auto-detection
-      const transcript = await this.client.transcripts.transcribe({
-        audio: audioBuffer,
-        speech_models: ['universal'],
-        language_code: 'en_us', // Force US English
-        language_detection: false, // Disable auto-detection
-        speaker_labels: true,
-        sentiment_analysis: true,
-        auto_chapters: true,
-        entity_detection: true,
-      });
+      const transcript = await this.transcribeWithRetry(audioBuffer);
 
       if (transcript.status === 'error') {
         throw new Error(`Transcription failed: ${transcript.error}`);

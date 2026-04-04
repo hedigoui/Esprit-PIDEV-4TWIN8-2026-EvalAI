@@ -129,7 +129,7 @@ const Reclamations = () => {
                 <LifeBuoy size={18} style={{ color: '#E31837' }} />
                 <div className={styles.pageTitle}>Reclamations</div>
               </div>
-              <div className={styles.pageSubtitle}>Review student issues and respond.</div>
+              <div className={styles.pageSubtitle}>Review tickets from students and instructors, then update status.</div>
             </div>
             <button className={styles.secondaryButton} onClick={fetchAll} disabled={loading}>
               <RefreshCw size={16} /> Refresh
@@ -210,7 +210,7 @@ const Reclamations = () => {
                           onChange={(e) =>
                             setDrafts((p) => ({ ...p, [r._id]: { ...draft, responseMessage: e.target.value } }))
                           }
-                          placeholder="Optional response message (visible to student)"
+                          placeholder="Optional reply (visible to the person who opened the ticket)"
                           style={{
                             width: '100%',
                             padding: '0.7rem 0.85rem',

@@ -387,3 +387,22 @@
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+:global([data-theme='dark']) .videoPlaceholder {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08));
+}
+
+:global([data-theme='dark']) .progressTrack {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:global([data-theme='dark']) .transcription,
+:global([data-theme='dark']) .aiMetric,
+:global([data-theme='dark']) .levelBtn,
+:global([data-theme='dark']) .textarea {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+:global([data-theme='dark']) .slider {
+  background: rgba(255, 255, 255, 0.12);
+}

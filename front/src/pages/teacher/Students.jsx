@@ -1,45 +1,120 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TeacherSidebar from '../../components/TeacherSidebar';
-import { Search, Filter, Eye, ClipboardCheck, MessageCircle, Users, TrendingUp, Calendar, Phone, MapPin } from 'lucide-react';
+import { Search, Filter, Eye, ClipboardCheck, MessageCircle, Users, TrendingUp, Calendar, Phone } from 'lucide-react';
 import styles from '../../styles/shared.module.css';
+import { oralPerformanceService } from '../services/oralPerformance.service';
+import teacherStyles from './Teacher.module.css';
 import studentsStyles from './Students.module.css';
+
+function normalizeDisplayScore(raw) {
+  if (raw == null || Number.isNaN(Number(raw))) return null;
+  const n = Number(raw);
+  if (n <= 10) return Math.round(n * 10);
+  return Math.round(Math.min(100, n));
+}
+
+function displayName(s) {
+  const n = `${s.firstName || ''} ${s.lastName || ''}`.trim();
+  return n || s.email || 'Student';
+}
+
+function profLabel(p) {
+  if (!p) return '—';
+  const m = {
+    beginner: 'Beginner',
+    intermediate: 'Intermediate',
+    advanced: 'Advanced',
+    proficient: 'Proficient',
+  };
+  return m[String(p).toLowerCase()] || String(p);
+}
+
+function getProficiencyColor(p) {
+  const c = {
+    beginner: '#ef4444',
+    intermediate: '#f97316',
+    advanced: '#22c55e',
+    proficient: '#8b5cf6',
+  };
+  return c[String(p || '').toLowerCase()] || '#64748b';
+}
+
+function enrichStudents(students, performances) {
+  const bySt = {};
+  (performances || []).forEach((p) => {
+    const sid = p.studentId;
+    if (!bySt[sid]) bySt[sid] = { count: 0, scores: [], profs: [] };
+    bySt[sid].count++;
+    if (p.totalScore != null) bySt[sid].scores.push({ t: p.createdAt, score: p.totalScore });
+    if (p.overallProficiency) bySt[sid].profs.push({ t: p.createdAt, p: p.overallProficiency });
+  });
+
+  return students.map((s) => {
+    const id = s._id?.toString?.() || s._id;
+    const ex = bySt[id] || { count: 0, scores: [], profs: [] };
+    const scores = [...ex.scores].sort((a, b) => new Date(b.t) - new Date(a.t));
+    const profs = [...ex.profs].sort((a, b) => new Date(b.t) - new Date(a.t));
+    const lastScore = scores[0]?.score;
+    const proficiency = profs[0]?.p || null;
+    return {
+      ...s,
+      displayName: displayName(s),
+      sessions: ex.count,
+      lastScore: lastScore != null ? normalizeDisplayScore(lastScore) : null,
+      proficiency,
+    };
+  });
+}
 
 const Students = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [students, setStudents] = useState([]);
+  const [performances, setPerformances] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('grid'); // grid or list
+  const [viewMode, setViewMode] = useState('grid');
+
+  const currentUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     loadStudents();
-  }, []);
+  }, [currentUser?.id]);
 
   const loadStudents = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        console.log('No token found');
         setStudents([]);
+        setPerformances([]);
         setLoading(false);
         return;
       }
 
-      const response = await fetch('http://localhost:3000/users/students', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const instructorId = currentUser?.id;
+      const [perfData, response] = await Promise.all([
+        instructorId ? oralPerformanceService.getInstructorPerformances(instructorId) : Promise.resolve([]),
+        fetch('http://localhost:3000/users/students', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
 
       if (response.ok) {
         const data = await response.json();
-        setStudents(data.data || []);
-        console.log(`✅ Loaded ${data.data?.length || 0} students from database`);
+        const raw = data.data || [];
+        setPerformances(Array.isArray(perfData) ? perfData : []);
+        setStudents(enrichStudents(raw, perfData));
       } else {
-        console.log('Failed to load students from API');
         setStudents([]);
+        setPerformances([]);
       }
     } catch (error) {
       console.error('Error loading students:', error);
@@ -49,70 +124,70 @@ const Students = () => {
     }
   };
 
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          student.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesLevel = levelFilter === 'all' || student.level === levelFilter;
+  const filteredStudents = students.filter((student) => {
+    const q = searchTerm.toLowerCase();
+    const matchesSearch =
+      student.displayName?.toLowerCase().includes(q) || student.email?.toLowerCase().includes(q);
+    const matchesLevel = levelFilter === 'all' || student.proficiency === levelFilter;
     return matchesSearch && matchesLevel;
   });
 
   const startConversation = (studentId) => {
-    console.log('🔍 Student ID:', studentId);
-    console.log('🔍 Student data:', students[0]);
     navigate(`/messages/${studentId}`);
-  };
-
-  const getLevelColor = (level) => {
-    const colors = {
-      'A1': '#10b981',
-      'A2': '#22c55e',
-      'B1': '#3b82f6',
-      'B2': '#6366f1',
-      'C1': '#8b5cf6'
-    };
-    return colors[level] || '#6b7280';
   };
 
   const getStatusColor = (status) => {
     const colors = {
-      'Active': '#10b981',
-      'Inactive': '#ef4444',
-      'Pending': '#f59e0b'
+      Active: '#10b981',
+      Inactive: '#ef4444',
+      Pending: '#f59e0b',
     };
     return colors[status] || '#6b7280';
   };
 
-  const stats = {
-    total: students.length,
-    active: students.filter(s => s.status === 'Active').length,
-    byLevel: {
-      A1: students.filter(s => s.level === 'A1').length,
-      A2: students.filter(s => s.level === 'A2').length,
-      B1: students.filter(s => s.level === 'B1').length,
-      B2: students.filter(s => s.level === 'B2').length,
-      C1: students.filter(s => s.level === 'C1').length,
-    }
-  };
+  const stats = useMemo(() => {
+    const total = students.length;
+    const active = students.filter((s) => s.isActive !== false).length;
+    const byProf = {
+      beginner: students.filter((s) => s.proficiency === 'beginner').length,
+      intermediate: students.filter((s) => s.proficiency === 'intermediate').length,
+      advanced: students.filter((s) => s.proficiency === 'advanced').length,
+      proficient: students.filter((s) => s.proficiency === 'proficient').length,
+    };
+    return { total, active, byProf };
+  }, [students]);
 
   return (
     <div className={styles.layout}>
       <TeacherSidebar />
       <div className={styles.mainContent}>
         <main className={styles.content}>
-          {/* Page Header */}
+          <div className={teacherStyles.hero}>
+            <div className={teacherStyles.heroText}>
+              <span className={teacherStyles.heroKicker}>Roster</span>
+              <h1 className={teacherStyles.heroTitle}>Your students</h1>
+              <p className={teacherStyles.heroSubtitle}>
+                Search the cohort, filter by proficiency from recent assessments, and jump into evaluation or messages.
+              </p>
+            </div>
+            <div className={teacherStyles.heroVisual} aria-hidden>
+              <div className={teacherStyles.heroOrb} />
+              <div className={teacherStyles.heroIconWrap}>
+                <Users size={34} strokeWidth={1.75} />
+              </div>
+            </div>
+          </div>
+
           <div className={studentsStyles.pageHeader}>
             <div className={studentsStyles.headerContent}>
               <div className={studentsStyles.headerText}>
                 <h1 className={studentsStyles.pageTitle}>
                   <Users size={28} className={studentsStyles.titleIcon} />
-                  Students
+                  Directory
                 </h1>
-                <p className={studentsStyles.pageSubtitle}>
-                  Manage and monitor your students' progress
-                </p>
+                <p className={studentsStyles.pageSubtitle}>Manage and monitor your students&apos; progress</p>
               </div>
-              
-              {/* Stats Cards */}
+
               <div className={studentsStyles.statsCards}>
                 <div className={studentsStyles.statCard}>
                   <div className={studentsStyles.statIcon}>
@@ -120,7 +195,7 @@ const Students = () => {
                   </div>
                   <div className={studentsStyles.statInfo}>
                     <span className={studentsStyles.statNumber}>{stats.total}</span>
-                    <span className={studentsStyles.statLabel}>Total Students</span>
+                    <span className={studentsStyles.statLabel}>Total</span>
                   </div>
                 </div>
                 <div className={studentsStyles.statCard}>
@@ -136,74 +211,65 @@ const Students = () => {
             </div>
           </div>
 
-          {/* Filters and View Toggle */}
           <div className={studentsStyles.controlsSection}>
             <div className={studentsStyles.filtersRow}>
               <div className={studentsStyles.searchBox}>
                 <Search size={18} className={studentsStyles.searchIcon} />
-                <input 
-                  type="text" 
-                  placeholder="Search students by name or email..." 
+                <input
+                  type="text"
+                  placeholder="Search by name or email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className={studentsStyles.searchInput}
                 />
               </div>
-              
+
               <div className={studentsStyles.filterGroup}>
                 <Filter size={18} className={studentsStyles.filterIcon} />
-                <select 
-                  value={levelFilter} 
-                  onChange={(e) => setLevelFilter(e.target.value)}
-                  className={studentsStyles.filterSelect}
-                >
-                  <option value="all">All Levels</option>
-                  <option value="A1">A1</option>
-                  <option value="A2">A2</option>
-                  <option value="B1">B1</option>
-                  <option value="B2">B2</option>
-                  <option value="C1">C1</option>
+                <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} className={studentsStyles.filterSelect}>
+                  <option value="all">All levels</option>
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                  <option value="proficient">Proficient</option>
                 </select>
               </div>
 
               <div className={studentsStyles.viewToggle}>
                 <button
+                  type="button"
                   onClick={() => setViewMode('grid')}
                   className={`${studentsStyles.viewButton} ${viewMode === 'grid' ? studentsStyles.activeView : ''}`}
                   title="Grid view"
                 >
-                  <div className={studentsStyles.gridIcon}></div>
+                  <div className={studentsStyles.gridIcon} />
                 </button>
                 <button
+                  type="button"
                   onClick={() => setViewMode('list')}
                   className={`${studentsStyles.viewButton} ${viewMode === 'list' ? studentsStyles.activeView : ''}`}
                   title="List view"
                 >
-                  <div className={studentsStyles.listIcon}></div>
+                  <div className={studentsStyles.listIcon} />
                 </button>
               </div>
             </div>
 
-            {/* Level Distribution */}
             <div className={studentsStyles.levelDistribution}>
-              {Object.entries(stats.byLevel).map(([level, count]) => (
+              {Object.entries(stats.byProf).map(([level, count]) => (
                 <div key={level} className={studentsStyles.levelStat}>
-                  <div 
-                    className={studentsStyles.levelDot}
-                    style={{ backgroundColor: getLevelColor(level) }}
-                  ></div>
-                  <span className={studentsStyles.levelName}>{level}</span>
+                  <div className={studentsStyles.levelDot} style={{ backgroundColor: getProficiencyColor(level) }} />
+                  <span className={studentsStyles.levelName}>{profLabel(level)}</span>
                   <span className={studentsStyles.levelCount}>{count}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Students List/Grid */}
           <div className={studentsStyles.studentsContainer}>
             {loading ? (
               <div className={studentsStyles.loadingState}>
-                <div className={studentsStyles.spinner}></div>
+                <div className={studentsStyles.spinner} />
                 <p>Loading students...</p>
               </div>
             ) : filteredStudents.length === 0 ? (
@@ -211,13 +277,16 @@ const Students = () => {
                 <div className={studentsStyles.emptyIcon}>👥</div>
                 <h3>No students found</h3>
                 <p>
-                  {searchTerm || levelFilter !== 'all' 
-                    ? 'No students match your current filters.' 
-                    : 'No students are enrolled in your classes yet.'
-                  }
+                  {searchTerm || levelFilter !== 'all'
+                    ? 'No students match your current filters.'
+                    : 'No students are enrolled yet.'}
                 </p>
                 <button 
-                  onClick={() => { setSearchTerm(''); setLevelFilter('all'); }}
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setLevelFilter('all');
+                  }}
                   className={studentsStyles.clearFiltersBtn}
                 >
                   Clear filters
@@ -230,33 +299,35 @@ const Students = () => {
                     <div className={studentsStyles.cardHeader}>
                       <div className={studentsStyles.studentAvatar}>
                         {student.avatar ? (
-                          <img src={student.avatar} alt={student.name} className={studentsStyles.avatarImage} />
+                          <img src={student.avatar} alt="" className={studentsStyles.avatarImage} />
                         ) : (
-                          <div className={studentsStyles.avatarPlaceholder}>
-                            {student.name?.charAt(0) || 'S'}
-                          </div>
+                          <div className={studentsStyles.avatarPlaceholder}>{displayName(student).charAt(0).toUpperCase()}</div>
                         )}
                       </div>
-                      <div className={studentsStyles.onlineStatus} title={student.status}></div>
+                      <div
+                        className={studentsStyles.onlineStatus}
+                        style={{ background: student.isActive === false ? '#94a3b8' : '#22c55e' }}
+                        title={student.isActive === false ? 'Inactive' : 'Active'}
+                      />
                     </div>
-                    
+
                     <div className={studentsStyles.cardBody}>
                       <div className={studentsStyles.studentInfo}>
-                        <h3 className={studentsStyles.studentName}>{student.name}</h3>
+                        <h3 className={studentsStyles.studentName}>{student.displayName}</h3>
                         <p className={studentsStyles.studentEmail}>{student.email}</p>
-                        
+
                         <div className={studentsStyles.studentMeta}>
-                          <span 
+                          <span
                             className={studentsStyles.levelBadge}
-                            style={{ backgroundColor: getLevelColor(student.level) }}
+                            style={{ backgroundColor: getProficiencyColor(student.proficiency) }}
                           >
-                            {student.level}
+                            {profLabel(student.proficiency)}
                           </span>
-                          <span 
+                          <span
                             className={studentsStyles.statusBadge}
-                            style={{ backgroundColor: getStatusColor(student.status) }}
+                            style={{ backgroundColor: getStatusColor(student.status || 'Active') }}
                           >
-                            {student.status}
+                            {student.status || 'Active'}
                           </span>
                         </div>
                       </div>
@@ -264,15 +335,11 @@ const Students = () => {
                       <div className={studentsStyles.studentDetails}>
                         <div className={studentsStyles.detailItem}>
                           <Phone size={14} />
-                          <span>{student.phone || 'Not provided'}</span>
-                        </div>
-                        <div className={studentsStyles.detailItem}>
-                          <MapPin size={14} />
-                          <span>{student.location || 'Not provided'}</span>
+                          <span>{student.phone || 'No phone'}</span>
                         </div>
                         <div className={studentsStyles.detailItem}>
                           <Calendar size={14} />
-                          <span>Joined {new Date(student.createdAt).toLocaleDateString()}</span>
+                          <span>Joined {student.createdAt ? new Date(student.createdAt).toLocaleDateString() : '—'}</span>
                         </div>
                       </div>
                     </div>
@@ -284,30 +351,33 @@ const Students = () => {
                           <span className={studentsStyles.statLabel}>Sessions</span>
                         </div>
                         <div className={studentsStyles.statItem}>
-                          <span className={studentsStyles.statNumber}>{student.lastScore || 0}%</span>
-                          <span className={studentsStyles.statLabel}>Score</span>
+                          <span className={studentsStyles.statNumber}>{student.lastScore != null ? `${student.lastScore}%` : '—'}</span>
+                          <span className={studentsStyles.statLabel}>Last score</span>
                         </div>
                       </div>
-                      
+
                       <div className={studentsStyles.studentActions}>
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => navigate(`/teacher/evaluate/${student._id}`)}
                           className={studentsStyles.actionButton}
-                          title="View student details and evaluate"
+                          title="Open evaluation"
                         >
                           <Eye size={16} />
                         </button>
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => navigate(`/teacher/evaluate/${student._id}`)}
                           className={studentsStyles.actionButton}
-                          title="Evaluate student performance"
+                          title="Evaluate"
                         >
                           <ClipboardCheck size={16} />
                         </button>
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => startConversation(student._id)}
                           className={`${studentsStyles.actionButton} ${studentsStyles.messageButton}`}
-                          title="Send message to student"
+                          title="Send message"
                         >
                           <MessageCircle size={16} />
                         </button>
@@ -322,50 +392,55 @@ const Students = () => {
                   <div key={student.id || student._id} className={studentsStyles.listItem}>
                     <div className={studentsStyles.listItemContent}>
                       <div className={studentsStyles.listItemAvatar}>
-                        <img 
-                          src={student.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(student.name || 'student')}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                          alt={student.name} 
+                        <img
+                          src={
+                            student.avatar ||
+                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(student.email || 'student')}&backgroundColor=b6e3f4,c0aede,d1d4f9`
+                          }
+                          alt=""
                         />
                       </div>
-                      
+
                       <div className={studentsStyles.listItemInfo}>
                         <div className={studentsStyles.listItemHeader}>
-                          <h4>{student.name}</h4>
+                          <h4>{student.displayName}</h4>
                           <div className={studentsStyles.listItemMeta}>
-                            <span 
+                            <span
                               className={studentsStyles.levelBadge}
-                              style={{ backgroundColor: getLevelColor(student.level) }}
+                              style={{ backgroundColor: getProficiencyColor(student.proficiency) }}
                             >
-                              {student.level}
+                              {profLabel(student.proficiency)}
                             </span>
-                            <span 
+                            <span
                               className={studentsStyles.statusBadge}
-                              style={{ backgroundColor: getStatusColor(student.status) }}
+                              style={{ backgroundColor: getStatusColor(student.status || 'Active') }}
                             >
-                              {student.status}
+                              {student.status || 'Active'}
                             </span>
                           </div>
                         </div>
                         <p>{student.email}</p>
                         <div className={studentsStyles.listItemDetails}>
                           <span>Sessions: {student.sessions || 0}</span>
-                          <span>Score: {student.lastScore || 0}%</span>
-                          <span>Joined: {new Date(student.createdAt).toLocaleDateString()}</span>
+                          <span>Score: {student.lastScore != null ? `${student.lastScore}%` : '—'}</span>
+                          <span>Joined: {student.createdAt ? new Date(student.createdAt).toLocaleDateString() : '—'}</span>
                         </div>
                       </div>
-                      
+
                       <div className={studentsStyles.listItemActions}>
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => navigate(`/teacher/evaluate/${student._id}`)}
                           className={studentsStyles.actionButton}
-                          title="View student details"
+                          title="Evaluate"
                         >
                           <Eye size={16} />
                         </button>
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => startConversation(student._id)}
                           className={`${studentsStyles.actionButton} ${studentsStyles.messageButton}`}
-                          title="Send message"
+                          title="Message"
                         >
                           <MessageCircle size={16} />
                         </button>

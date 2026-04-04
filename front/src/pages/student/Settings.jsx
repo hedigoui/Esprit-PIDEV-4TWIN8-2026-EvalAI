@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import StudentSidebar from '../../components/StudentSidebar';
-import { User, Bell, Lock, Globe, Volume2, Eye, EyeOff } from 'lucide-react';
+import { Bell, Lock, Globe, Eye, EyeOff } from 'lucide-react';
 import styles from '../../styles/shared.module.css';
 import settingsStyles from './Settings.module.css';
+import { getStoredTheme, setStoredTheme } from '../../theme';
 
 const Settings = () => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -15,6 +16,7 @@ const Settings = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [user, setUser] = useState(null);
+  const [darkMode, setDarkMode] = useState(() => getStoredTheme() === 'dark');
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -305,11 +307,19 @@ const Settings = () => {
 
               <div className={settingsStyles.toggleItem}>
                 <div>
-                  <h4>Dark Mode</h4>
-                  <p>Use dark theme</p>
+                  <h4>Dark mode</h4>
+                  <p>Use dark theme across the app</p>
                 </div>
                 <label className={settingsStyles.toggle}>
-                  <input type="checkbox" defaultChecked />
+                  <input
+                    type="checkbox"
+                    checked={darkMode}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setDarkMode(on);
+                      setStoredTheme(on ? 'dark' : 'light');
+                    }}
+                  />
                   <span className={settingsStyles.slider}></span>
                 </label>
               </div>

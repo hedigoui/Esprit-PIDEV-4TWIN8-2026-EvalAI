@@ -79,19 +79,19 @@ export class CommunicationService {
     limit: number = 50,
   ): Promise<Message[]> {
     try {
-      // Always query for messages between the two users
-      const messages = await this.messageRepository.find({
-        where: {
-          $or: [
-            { senderId: userId1, receiverId: userId2 },
-            { senderId: userId2, receiverId: userId1 },
-          ],
-        },
-        order: { createdAt: -1 },
-        take: limit,
-      });
-
-      return messages.reverse();
+      const [forward, backward] = await Promise.all([
+        this.messageRepository.find({
+          where: { senderId: userId1, receiverId: userId2 },
+        }),
+        this.messageRepository.find({
+          where: { senderId: userId2, receiverId: userId1 },
+        }),
+      ]);
+      const merged = [...forward, ...backward].sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+      return merged.slice(-limit);
     } catch (error) {
       console.error('Error getting conversation messages:', error);
       throw new BadRequestException(error.message);
@@ -100,13 +100,19 @@ export class CommunicationService {
 
   async getUserConversations(userId: string): Promise<any[]> {
     try {
-      const conversations = await this.conversationRepository.find({
-        where: {
-          participantIds: { $in: [userId] },
-          isActive: true,
-        },
-        order: { lastMessageTime: -1 },
+      const allActive = await this.conversationRepository.find({
+        where: { isActive: true },
       });
+      const conversations = allActive
+        .filter(
+          (c) =>
+            Array.isArray(c.participantIds) && c.participantIds.includes(userId),
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.lastMessageTime || b.updatedAt || 0).getTime() -
+            new Date(a.lastMessageTime || a.updatedAt || 0).getTime(),
+        );
 
       // Enrich conversations with user details
       const enrichedConversations = await Promise.all(
@@ -164,26 +170,17 @@ export class CommunicationService {
     userId2: string,
   ): Promise<Conversation | null> {
     try {
-      // Find all active conversations for the first user
       const conversations = await this.conversationRepository.find({
-        where: {
-          participantIds: { $in: [userId1] },
-          isActive: true,
-        },
+        where: { isActive: true },
       });
-
-      // Find the one that also contains the second user
-      const conversation = conversations.find(
-        (conv) =>
-          conv.participantIds.includes(userId1) &&
-          conv.participantIds.includes(userId2),
+      return (
+        conversations.find(
+          (conv) =>
+            Array.isArray(conv.participantIds) &&
+            conv.participantIds.includes(userId1) &&
+            conv.participantIds.includes(userId2),
+        ) || null
       );
-
-      if (conversation) {
-        return conversation;
-      }
-
-      return null;
     } catch (error) {
       console.error('Error finding conversation:', error);
       return null;

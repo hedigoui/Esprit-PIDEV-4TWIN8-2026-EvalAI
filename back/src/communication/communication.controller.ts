@@ -11,13 +11,19 @@ import {
   BadRequestException,
   UseInterceptors,
   UploadedFile,
-  Request,
+  Req,
+  UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CommunicationService } from './communication.service';
 import { MessageType } from './communication.models';
 import type { Express } from 'express';
-import { extractUserFromToken } from '../auth/jwt.util';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthUser } from '../auth/jwt-auth.guard';
+
+type AuthedRequest = Request & { user: AuthUser };
 
 @Controller('communication')
 export class CommunicationController {
@@ -26,6 +32,7 @@ export class CommunicationController {
   // ===== MESSAGING ENDPOINTS =====
 
   @Post('messages')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async sendMessage(
     @Body()
@@ -34,12 +41,13 @@ export class CommunicationController {
       content: string;
       type?: MessageType;
     },
-    @Request() req: any,
+    @Req() req: AuthedRequest,
   ) {
     try {
-      // Get the actual user ID from the JWT token
-      const user = extractUserFromToken(req);
-      const senderId = user?.sub || 'temp-sender-id';
+      const senderId = req.user?.sub;
+      if (!senderId) {
+        throw new UnauthorizedException('Invalid token');
+      }
       const { receiverId, content, type = MessageType.TEXT } = body;
 
       const message = await this.communicationService.sendMessage(
@@ -60,24 +68,24 @@ export class CommunicationController {
   }
 
   @Get('messages/:userId')
+  @UseGuards(JwtAuthGuard)
   async getConversation(
     @Param('userId') userId: string,
-    @Request() req: any,
+    @Req() req: AuthedRequest,
     @Query('limit') limit?: string,
   ) {
     try {
-      // Get the actual user ID from the JWT token
-      const user = extractUserFromToken(req);
-      const currentUserId = user?.sub || 'temp-current-user-id';
+      const currentUserId = req.user?.sub;
+      if (!currentUserId) {
+        throw new UnauthorizedException('Invalid token');
+      }
 
-      // Get messages
       const messages = await this.communicationService.getConversationMessages(
         currentUserId,
         userId,
-        limit ? parseInt(limit) : 50,
+        limit ? parseInt(limit, 10) : 50,
       );
 
-      // Get other user details
       const otherUser = await this.communicationService.getUserById(userId);
 
       return {
@@ -95,11 +103,13 @@ export class CommunicationController {
   }
 
   @Get('conversations')
-  async getUserConversations(@Request() req: any) {
+  @UseGuards(JwtAuthGuard)
+  async getUserConversations(@Req() req: AuthedRequest) {
     try {
-      // Get the actual user ID from the JWT token
-      const user = extractUserFromToken(req);
-      const userId = user?.sub || 'temp-current-user-id';
+      const userId = req.user?.sub;
+      if (!userId) {
+        throw new UnauthorizedException('Invalid token');
+      }
       const conversations =
         await this.communicationService.getUserConversations(userId);
 
@@ -113,6 +123,7 @@ export class CommunicationController {
   }
 
   @Post('messages/upload')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadFileMessage(
     @UploadedFile() file: Express.Multer.File,
@@ -121,13 +132,17 @@ export class CommunicationController {
       receiverId: string;
       content: string;
     },
+    @Req() req: AuthedRequest,
   ) {
     try {
       if (!file) {
         throw new BadRequestException('No file uploaded');
       }
 
-      const senderId = 'temp-sender-id'; // TODO: Get from JWT token properly
+      const senderId = req.user?.sub;
+      if (!senderId) {
+        throw new UnauthorizedException('Invalid token');
+      }
       const { receiverId, content } = body;
 
       // For now, store file info as base64
@@ -339,6 +354,7 @@ export class CommunicationController {
   }
 
   @Post('feedback')
+  @UseGuards(JwtAuthGuard)
   async sendFeedback(
     @Body()
     body: {
@@ -347,10 +363,13 @@ export class CommunicationController {
       type: 'positive' | 'constructive' | 'general';
       relatedTo?: string; // Could be session ID, assignment ID, etc.
     },
+    @Req() req: AuthedRequest,
   ) {
     try {
-      // TODO: Get senderId from JWT token properly
-      const senderId = 'temp-sender-id';
+      const senderId = req.user?.sub;
+      if (!senderId) {
+        throw new UnauthorizedException('Invalid token');
+      }
       const { receiverId, feedback, type, relatedTo: _relatedTo } = body;
 
       // Send feedback as a special message type

@@ -1,37 +1,127 @@
 import TeacherSidebar from '../../components/TeacherSidebar';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+} from 'recharts';
 import { Download, ClipboardCheck, TrendingUp, Award, BookOpen, ArrowUpRight, Users, Medal } from 'lucide-react';
 import styles from '../../styles/shared.module.css';
+import teacherStyles from './Teacher.module.css';
+import { oralPerformanceService } from '../services/oralPerformance.service';
 
-const monthlyData = [
-  { month: 'Sep', evaluations: 42, avgScore: 72 },
-  { month: 'Oct', evaluations: 38, avgScore: 74 },
-  { month: 'Nov', evaluations: 45, avgScore: 73 },
-  { month: 'Dec', evaluations: 50, avgScore: 76 },
-  { month: 'Jan', evaluations: 55, avgScore: 78 },
-  { month: 'Feb', evaluations: 50, avgScore: 80 },
-];
+function normalizeDisplayScore(raw) {
+  if (raw == null || Number.isNaN(Number(raw))) return null;
+  const n = Number(raw);
+  if (n <= 10) return Math.round(n * 10);
+  return Math.round(Math.min(100, n));
+}
 
-const topStudents = [
-  { rank: 1, name: 'Alice Martin', from: 58, to: 82, improvement: '+24', avatar: 'AM', medal: '🥇' },
-  { rank: 2, name: 'James Wilson', from: 61, to: 83, improvement: '+22', avatar: 'JW', medal: '🥈' },
-  { rank: 3, name: 'Sophie Brown', from: 65, to: 85, improvement: '+20', avatar: 'SB', medal: '🥉' },
-  { rank: 4, name: 'Liam Davis', from: 59, to: 77, improvement: '+18', avatar: 'LD', medal: '' },
-  { rank: 5, name: 'Emma Thomas', from: 63, to: 79, improvement: '+16', avatar: 'ET', medal: '' },
-];
+function profToShort(p) {
+  if (!p) return '—';
+  const map = {
+    beginner: 'A1–A2',
+    intermediate: 'B1',
+    advanced: 'B2',
+    proficient: 'C1+',
+  };
+  return map[String(p).toLowerCase()] || String(p);
+}
+
+function buildMonthlySeries(performances, monthsBack = 6) {
+  const rows = [];
+  const now = new Date();
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const label = d.toLocaleDateString(undefined, { month: 'short' });
+    const inMonth = performances.filter((p) => {
+      const t = new Date(p.createdAt);
+      return t.getFullYear() === y && t.getMonth() === m;
+    });
+    const graded = inMonth.filter((p) => p.status === 'graded' && p.totalScore != null);
+    const scores = graded.map((p) => normalizeDisplayScore(p.totalScore)).filter((s) => s != null);
+    const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+    rows.push({
+      month: label,
+      evaluations: inMonth.length,
+      avgScore: avgScore ?? 0,
+    });
+  }
+  return rows;
+}
+
+function topImproving(performances, studentsById) {
+  const byStudent = {};
+  performances
+    .filter((p) => p.status === 'graded' && p.totalScore != null)
+    .forEach((p) => {
+      const id = p.studentId;
+      if (!byStudent[id]) byStudent[id] = [];
+      const sc = normalizeDisplayScore(p.totalScore);
+      if (sc == null) return;
+      byStudent[id].push({ date: p.createdAt, score: sc });
+    });
+
+  const ranked = Object.entries(byStudent)
+    .map(([id, arr]) => {
+      arr.sort((a, b) => new Date(a.date) - new Date(b.date));
+      const from = arr[0].score;
+      const to = arr[arr.length - 1].score;
+      const st = studentsById[id];
+      const name = st ? `${st.firstName || ''} ${st.lastName || ''}`.trim() || st.email : 'Student';
+      return {
+        id,
+        name,
+        from,
+        to,
+        delta: to - from,
+        sessions: arr.length,
+      };
+    })
+    .filter((x) => x.sessions >= 2 && x.delta > 0)
+    .sort((a, b) => b.delta - a.delta)
+    .slice(0, 5);
+
+  if (ranked.length > 0) return ranked;
+
+  return Object.entries(byStudent)
+    .map(([id, arr]) => {
+      arr.sort((a, b) => new Date(b.date) - new Date(a.date));
+      const to = arr[0]?.score ?? 0;
+      const st = studentsById[id];
+      const name = st ? `${st.firstName || ''} ${st.lastName || ''}`.trim() || st.email : 'Student';
+      return { id, name, from: to, to, delta: 0, sessions: arr.length };
+    })
+    .sort((a, b) => b.to - a.to)
+    .slice(0, 5);
+}
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div style={{
-        background: 'rgba(15,15,26,0.92)', backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px',
-        padding: '0.6rem 0.85rem', boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
-      }}>
+      <div
+        style={{
+          background: 'rgba(15,15,26,0.92)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '12px',
+          padding: '0.6rem 0.85rem',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
+        }}
+      >
         <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', marginBottom: '0.2rem' }}>{label}</p>
         {payload.map((p, i) => (
           <p key={i} style={{ color: p.color || '#fff', fontSize: '0.82rem', fontWeight: '700' }}>
-            {p.name === 'evaluations' ? `${p.value} evaluations` : `Avg: ${p.value}/100`}
+            {p.name === 'evaluations' ? `${p.value} sessions` : `Avg: ${p.value}/100`}
           </p>
         ))}
       </div>
@@ -41,142 +131,273 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const Reports = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(null);
+  const [performances, setPerformances] = useState([]);
+  const [studentCount, setStudentCount] = useState(0);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [topList, setTopList] = useState([]);
+  const [avgDelta, setAvgDelta] = useState(null);
+
+  const currentUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const instructorId = currentUser?.id;
+        if (!instructorId) {
+          setLoading(false);
+          return;
+        }
+        const [statsData, perfData, studentsResponse] = await Promise.all([
+          oralPerformanceService.getStatistics(instructorId),
+          oralPerformanceService.getInstructorPerformances(instructorId),
+          fetch('http://localhost:3000/users/students').then((r) => (r.ok ? r.json() : { data: [] })),
+        ]);
+        if (cancelled) return;
+        const list = perfData || [];
+        setPerformances(list);
+        setStats(statsData || null);
+        const students = studentsResponse?.data || [];
+        setStudentCount(students.length);
+        const studentsById = Object.fromEntries(students.map((s) => [s._id?.toString?.(), s]));
+
+        setMonthlyData(buildMonthlySeries(list, 6));
+        setTopList(topImproving(list, studentsById));
+
+        const series = buildMonthlySeries(list, 6).filter((x) => x.avgScore > 0);
+        if (series.length >= 2) {
+          const a = series[0].avgScore;
+          const b = series[series.length - 1].avgScore;
+          setAvgDelta(a > 0 ? Math.round(((b - a) / a) * 100) : null);
+        } else setAvgDelta(null);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
+
+  const avgScoreDisplay = normalizeDisplayScore(stats?.averageScore) ?? stats?.averageScore ?? '—';
+  const totalEvaluations = stats?.completedPerformances ?? performances.filter((p) => p.status === 'graded').length;
+  const monthEvals = useMemo(() => {
+    const now = new Date();
+    return performances.filter((p) => {
+      const t = new Date(p.createdAt);
+      return t.getFullYear() === now.getFullYear() && t.getMonth() === now.getMonth();
+    }).length;
+  }, [performances]);
+
+  const cefrApprox = useMemo(() => {
+    const dist = stats?.proficiencyDistribution || {};
+    const entries = Object.entries(dist).sort((a, b) => b[1] - a[1]);
+    if (!entries.length || entries[0][1] === 0) return '—';
+    return profToShort(entries[0][0]);
+  }, [stats]);
+
+  const improvementHeadline = useMemo(() => {
+    const graded = performances.filter((p) => p.status === 'graded' && p.totalScore != null);
+    if (graded.length < 2) return '—';
+    const sorted = [...graded].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const from = normalizeDisplayScore(sorted[0].totalScore);
+    const to = normalizeDisplayScore(sorted[sorted.length - 1].totalScore);
+    if (from == null || to == null || from === 0) return '—';
+    return `+${Math.round(((to - from) / from) * 100)}%`;
+  }, [performances]);
+
+  const lineDomain = useMemo(() => {
+    const vals = monthlyData.map((m) => m.avgScore).filter((v) => v > 0);
+    if (!vals.length) return [0, 100];
+    const lo = Math.max(0, Math.min(...vals) - 10);
+    const hi = Math.min(100, Math.max(...vals) + 5);
+    return [lo, hi];
+  }, [monthlyData]);
+
   return (
     <div className={styles.layout}>
       <TeacherSidebar />
       <div className={styles.mainContent}>
         <main className={styles.content}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+          <div className={teacherStyles.hero}>
+            <div className={teacherStyles.heroText}>
+              <span className={teacherStyles.heroKicker}>Reports</span>
+              <h1 className={teacherStyles.heroTitle}>Evaluation insights</h1>
+              <p className={teacherStyles.heroSubtitle}>
+                Monthly volume, score trends, and learners with the strongest progress—based on your live data.
+              </p>
+            </div>
+            <div className={teacherStyles.heroVisual} aria-hidden>
+              <div className={teacherStyles.heroOrb} />
+              <div className={teacherStyles.heroIconWrap}>
+                <TrendingUp size={34} strokeWidth={1.75} />
+              </div>
+            </div>
+          </div>
+
+          <div className={teacherStyles.headerRow}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#E31837', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Reports</span>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: '600',
+                    color: '#E31837',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                  }}
+                >
+                  Analytics
+                </span>
               </div>
-              <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1a1a2e', letterSpacing: '-0.03em', lineHeight: '1.2' }}>
-                Evaluation Reports
-              </h1>
-              <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.3rem' }}>Detailed overview of your evaluation activity</p>
             </div>
-            <button style={{
-              padding: '0.6rem 1.2rem', background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.08)',
-              borderRadius: '12px', color: '#64748b', fontWeight: '600', fontSize: '0.82rem',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontFamily: 'inherit',
-            }}>
-              <Download size={16} /> Export Report
+            <button type="button" className={teacherStyles.btnGhost}>
+              <Download size={16} /> Export
             </button>
           </div>
 
-          {/* Stat Bento Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-            {/* Total Evaluations - accent */}
-            <div style={{
-              background: 'linear-gradient(135deg, #0f0f1a, #1a1a2e)', borderRadius: '20px',
-              padding: '1.35rem', position: 'relative', overflow: 'hidden', color: '#fff',
-            }}>
-              <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '55px', height: '55px', borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
-              <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.8rem' }}>
+          {loading && <p className={teacherStyles.loadingLine}>Loading reports…</p>}
+
+          <div className={teacherStyles.bento4}>
+            <div className={teacherStyles.statDark}>
+              <div className={teacherStyles.statDarkAccent} />
+              <div
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '0.8rem',
+                }}
+              >
                 <ClipboardCheck size={16} />
               </div>
-              <div style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.04em', lineHeight: '1' }}>280</div>
-              <div style={{ fontSize: '0.72rem', opacity: 0.6, marginTop: '0.35rem' }}>Total Evaluations</div>
+              <div className={teacherStyles.statValueLight}>{totalEvaluations}</div>
+              <div className={teacherStyles.statLabelLight}>Graded sessions</div>
             </div>
 
-            {/* Avg Score */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.35rem',
-            }}>
+            <div className={teacherStyles.statGlass}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(59,130,246,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
+                <div
+                  className={teacherStyles.iconBox}
+                  style={{ background: 'rgba(59,130,246,0.08)', color: '#3b82f6' }}
+                >
                   <TrendingUp size={16} />
                 </div>
-                <span style={{ fontSize: '0.62rem', fontWeight: '700', color: '#22c55e', background: 'rgba(34,197,94,0.08)', padding: '0.15rem 0.45rem', borderRadius: '6px' }}>+3.5</span>
+                {avgDelta != null && (
+                  <span
+                    style={{
+                      fontSize: '0.62rem',
+                      fontWeight: '700',
+                      color: '#22c55e',
+                      background: 'rgba(34,197,94,0.08)',
+                      padding: '0.15rem 0.45rem',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    {avgDelta >= 0 ? '+' : ''}
+                    {avgDelta}%
+                  </span>
+                )}
               </div>
-              <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#1a1a2e', marginTop: '0.6rem', letterSpacing: '-0.04em', lineHeight: '1' }}>76.5</div>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.35rem' }}>Average Score</div>
+              <div className={teacherStyles.statValue} style={{ marginTop: '0.6rem' }}>
+                {avgScoreDisplay}
+              </div>
+              <div className={teacherStyles.statLabel}>Average score</div>
             </div>
 
-            {/* Avg CEFR */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.35rem',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(227,24,55,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#E31837' }}>
-                  <Award size={16} />
-                </div>
+            <div className={teacherStyles.statGlass}>
+              <div
+                className={teacherStyles.iconBox}
+                style={{ background: 'rgba(227,24,55,0.08)', color: '#E31837', marginBottom: '0.6rem' }}
+              >
+                <Award size={16} />
               </div>
-              <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#1a1a2e', marginTop: '0.6rem', letterSpacing: '-0.04em', lineHeight: '1' }}>B1+</div>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.35rem' }}>Avg CEFR Level</div>
+              <div className={teacherStyles.statValue}>{cefrApprox}</div>
+              <div className={teacherStyles.statLabel}>Typical band</div>
             </div>
 
-            {/* Improvement */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.35rem',
-            }}>
+            <div className={teacherStyles.statGlass}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(34,197,94,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e' }}>
+                <div
+                  className={teacherStyles.iconBox}
+                  style={{ background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}
+                >
                   <BookOpen size={16} />
                 </div>
-                <span style={{ fontSize: '0.62rem', fontWeight: '700', color: '#22c55e', background: 'rgba(34,197,94,0.08)', padding: '0.15rem 0.45rem', borderRadius: '6px' }}>↑ avg</span>
               </div>
-              <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#1a1a2e', marginTop: '0.6rem', letterSpacing: '-0.04em', lineHeight: '1' }}>+15%</div>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.35rem' }}>Avg Improvement</div>
+              <div className={teacherStyles.statValue} style={{ marginTop: '0.6rem' }}>
+                {improvementHeadline}
+              </div>
+              <div className={teacherStyles.statLabel}>Overall progress (first → last)</div>
             </div>
           </div>
 
-          {/* Charts Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            {/* Bar Chart - Monthly Evaluations */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem',
-            }}>
+          <div className={teacherStyles.reportsGrid2}>
+            <div className={teacherStyles.panel}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <div>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>Monthly Evaluations</h3>
-                  <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.15rem' }}>Number of evaluations per month</p>
+                  <h3 className={teacherStyles.panelTitle}>Sessions per month</h3>
+                  <p className={teacherStyles.panelHint}>All performances (last 6 months)</p>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={monthlyData} barSize={28}>
                   <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
                   <XAxis dataKey="month" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
                   <Tooltip content={<CustomTooltip />} />
                   <defs>
-                    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="barGradReports" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#E31837" />
                       <stop offset="100%" stopColor="#E31837" stopOpacity={0.6} />
                     </linearGradient>
                   </defs>
-                  <Bar dataKey="evaluations" fill="url(#barGrad)" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="evaluations" fill="url(#barGradReports)" radius={[6, 6, 0, 0]} name="evaluations" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
-            {/* Line Chart - Avg Score Trend */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem',
-            }}>
+            <div className={teacherStyles.panel}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <div>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>Average Score Trend</h3>
-                  <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.15rem' }}>Student average over time</p>
+                  <h3 className={teacherStyles.panelTitle}>Average score trend</h3>
+                  <p className={teacherStyles.panelHint}>Graded sessions only</p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', fontWeight: '600', color: '#22c55e' }}>
-                  <ArrowUpRight size={14} /> +8
-                </div>
+                {avgDelta != null && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', fontWeight: '600', color: '#22c55e' }}>
+                    <ArrowUpRight size={14} /> {avgDelta >= 0 ? '+' : ''}
+                    {avgDelta}%
+                  </div>
+                )}
               </div>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={monthlyData}>
                   <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
                   <XAxis dataKey="month" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} domain={[65, 85]} />
+                  <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} domain={lineDomain} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="avgScore" stroke="#3b82f6" strokeWidth={2.5} name="avgScore"
+                  <Line
+                    type="monotone"
+                    dataKey="avgScore"
+                    stroke="#3b82f6"
+                    strokeWidth={2.5}
+                    name="avgScore"
                     dot={{ fill: '#fff', stroke: '#3b82f6', strokeWidth: 2, r: 4 }}
                     activeDot={{ fill: '#3b82f6', stroke: '#fff', strokeWidth: 2, r: 6 }}
                   />
@@ -185,76 +406,88 @@ const Reports = () => {
             </div>
           </div>
 
-          {/* Top Improving Students */}
-          <div style={{
-            background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem', marginBottom: '1.5rem',
-          }}>
+          <div className={teacherStyles.panel} style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Medal size={16} style={{ color: '#f59e0b' }} />
-                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>Top Improving Students</h3>
+                <h3 className={teacherStyles.panelTitle} style={{ margin: 0 }}>
+                  Top learners
+                </h3>
               </div>
-              <span style={{ fontSize: '0.68rem', fontWeight: '600', color: '#E31837', cursor: 'pointer' }}>View all →</span>
+              <button type="button" className={teacherStyles.linkAccent} onClick={() => navigate('/teacher/students')}>
+                View roster →
+              </button>
             </div>
+            {topList.length === 0 && !loading && (
+              <p style={{ color: '#94a3b8', fontSize: '0.88rem' }}>Not enough graded history to rank improvement yet.</p>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {topStudents.map((s) => (
-                <div key={s.rank} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '0.85rem 1rem', background: 'rgba(0,0,0,0.015)', borderRadius: '14px',
-                  borderLeft: s.rank <= 3 ? '3px solid' : '3px solid transparent',
-                  borderLeftColor: s.rank === 1 ? '#f59e0b' : s.rank === 2 ? '#94a3b8' : s.rank === 3 ? '#cd7f32' : 'transparent',
-                }}>
+              {topList.map((s, idx) => (
+                <div
+                  key={s.id}
+                  role="button"
+                  tabIndex={0}
+                  className={teacherStyles.rowMuted}
+                  onClick={() => navigate(`/teacher/evaluate/${s.id}`)}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/teacher/evaluate/${s.id}`)}
+                  style={{
+                    borderLeft: idx < 3 ? '3px solid #f59e0b' : '3px solid transparent',
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                    <span style={{ fontSize: '1.1rem', width: '24px', textAlign: 'center' }}>{s.medal || `#${s.rank}`}</span>
-                    <div style={{
-                      width: '42px', height: '42px', borderRadius: '12px',
-                      background: `linear-gradient(135deg, ${s.rank <= 3 ? 'rgba(245,158,11,0.1)' : 'rgba(0,0,0,0.04)'}, ${s.rank <= 3 ? 'rgba(245,158,11,0.04)' : 'rgba(0,0,0,0.02)'})`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: '800', fontSize: '0.72rem', color: s.rank <= 3 ? '#f59e0b' : '#64748b',
-                    }}>{s.avatar}</div>
+                    <span style={{ fontSize: '1rem', width: '28px', textAlign: 'center', fontWeight: 800, color: '#94a3b8' }}>
+                      {idx + 1}
+                    </span>
+                    <div
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background:
+                          idx < 3 ? 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.05))' : 'rgba(0,0,0,0.04)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: '0.72rem',
+                        color: idx < 3 ? '#f59e0b' : '#64748b',
+                      }}
+                    >
+                      {s.name.slice(0, 2).toUpperCase()}
+                    </div>
                     <div>
                       <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1a1a2e' }}>{s.name}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Score: {s.from} → {s.to}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                        Score {s.from} → {s.to}
+                        {s.sessions > 1 ? ` · ${s.sessions} graded` : ''}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    {/* Mini progress bar */}
-                    <div style={{ width: '80px', height: '6px', borderRadius: '3px', background: 'rgba(0,0,0,0.04)' }}>
-                      <div style={{
-                        width: `${((s.to - s.from) / 30) * 100}%`, height: '100%', borderRadius: '3px',
-                        background: s.rank <= 3 ? 'linear-gradient(90deg, #f59e0b, #eab308)' : 'linear-gradient(90deg, #3b82f6, #60a5fa)',
-                      }} />
-                    </div>
-                    <span style={{
-                      fontSize: '0.82rem', fontWeight: '800',
-                      color: '#22c55e',
-                    }}>{s.improvement}</span>
-                  </div>
+                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#22c55e' }}>
+                    {s.delta > 0 ? `+${s.delta}` : s.to}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Bottom Bar */}
-          <div style={{
-            background: 'linear-gradient(135deg, #0f0f1a, #1a1a2e)', borderRadius: '18px',
-            padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className={teacherStyles.footerBar}>
+            <div className={teacherStyles.footerItem}>
               <Users size={16} style={{ color: 'rgba(255,255,255,0.5)' }} />
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem' }}>Active Students</span>
-              <span style={{ color: '#fff', fontWeight: '700', fontSize: '0.85rem' }}>48</span>
+              <span className={teacherStyles.footerLabel}>Students</span>
+              <span className={teacherStyles.footerValue}>{studentCount}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div className={teacherStyles.footerItem}>
               <ClipboardCheck size={16} style={{ color: 'rgba(255,255,255,0.5)' }} />
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem' }}>This Month</span>
-              <span style={{ color: '#fff', fontWeight: '700', fontSize: '0.85rem' }}>50 evaluations</span>
+              <span className={teacherStyles.footerLabel}>This month</span>
+              <span className={teacherStyles.footerValue}>{monthEvals} sessions</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div className={teacherStyles.footerItem}>
               <TrendingUp size={16} style={{ color: 'rgba(255,255,255,0.5)' }} />
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem' }}>Avg Score</span>
-              <span style={{ color: '#22c55e', fontWeight: '700', fontSize: '0.85rem' }}>80/100</span>
+              <span className={teacherStyles.footerLabel}>Avg score</span>
+              <span style={{ color: '#22c55e', fontWeight: '700', fontSize: '0.85rem' }}>
+                {typeof avgScoreDisplay === 'number' ? `${avgScoreDisplay}/100` : avgScoreDisplay}
+              </span>
             </div>
           </div>
         </main>

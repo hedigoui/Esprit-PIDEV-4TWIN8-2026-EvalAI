@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, User, GraduationCap, Mic, Github } from 'lucide-react';
 import styles from './Login.module.css';
+import { API_BASE_URL } from '../config/api';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -40,7 +41,7 @@ const Signup = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/users', {
+      const response = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -289,11 +290,25 @@ const Signup = () => {
             </div>
 
             <div className={styles.socialButtons}>
-              <button type="button" className={styles.socialButton}>
+              <button
+                type="button"
+                className={styles.socialButton}
+                disabled={loading}
+                onClick={() => {
+                  window.location.assign(`${API_BASE_URL}/auth/github`);
+                }}
+              >
                 <Github size={20} />
                 <span>GitHub</span>
               </button>
-              <button type="button" className={`${styles.socialButton} ${styles.googleButton}`}>
+              <button
+                type="button"
+                className={`${styles.socialButton} ${styles.googleButton}`}
+                disabled={loading}
+                onClick={() => {
+                  window.location.assign(`${API_BASE_URL}/auth/google`);
+                }}
+              >
                 <svg width="20" height="20" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>

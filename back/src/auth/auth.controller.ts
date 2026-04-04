@@ -2,13 +2,16 @@ import { Controller, Get, UseGuards, Req, Res } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import { OAuthService } from './oauth.service';
+import { OauthConfiguredGuard } from './oauth-config.guard';
+import { RequireOauthProvider } from './require-oauth.decorator';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly oauthService: OAuthService) {}
 
   @Get('google')
-  @UseGuards(AuthGuard('google'))
+  @RequireOauthProvider('google')
+  @UseGuards(OauthConfiguredGuard, AuthGuard('google'))
   async googleAuth() {
     // Initiates Google OAuth flow
   }
@@ -25,14 +28,20 @@ export class AuthController {
       const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(jwtResponse.user))}`;
 
       return res.redirect(redirectUrl);
-    } catch (_error) {
+    } catch (error) {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      return res.redirect(`${frontendUrl}/login?error=auth_failed`);
+      let code = 'oauth_failed';
+      if (error instanceof Error) {
+        if (error.message === 'OAUTH_INACTIVE') code = 'deactivated';
+        else if (error.message === 'OAUTH_NO_EMAIL') code = 'oauth_email';
+      }
+      return res.redirect(`${frontendUrl}/?error=${code}`);
     }
   }
 
   @Get('github')
-  @UseGuards(AuthGuard('github'))
+  @RequireOauthProvider('github')
+  @UseGuards(OauthConfiguredGuard, AuthGuard('github'))
   async githubAuth() {
     // Initiates GitHub OAuth flow
   }
@@ -49,9 +58,14 @@ export class AuthController {
       const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(jwtResponse.user))}`;
 
       return res.redirect(redirectUrl);
-    } catch (_error) {
+    } catch (error) {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      return res.redirect(`${frontendUrl}/login?error=auth_failed`);
+      let code = 'oauth_failed';
+      if (error instanceof Error) {
+        if (error.message === 'OAUTH_INACTIVE') code = 'deactivated';
+        else if (error.message === 'OAUTH_NO_EMAIL') code = 'oauth_email';
+      }
+      return res.redirect(`${frontendUrl}/?error=${code}`);
     }
   }
 }

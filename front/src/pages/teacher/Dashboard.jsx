@@ -1,44 +1,76 @@
 import TeacherSidebar from '../../components/TeacherSidebar';
-import { Users, ClipboardCheck, Clock, TrendingUp, Calendar, Mic, ArrowUpRight, Search, MoreHorizontal, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Users,
+  ClipboardCheck,
+  Clock,
+  TrendingUp,
+  Calendar,
+  Mic,
+  ArrowUpRight,
+  ListTodo,
+} from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, CartesianGrid } from 'recharts';
 import styles from '../../styles/shared.module.css';
+import teacherStyles from './Teacher.module.css';
+import { oralPerformanceService } from '../services/oralPerformance.service';
 
-const weeklyData = [
-  { name: 'Mon', sessions: 4 },
-  { name: 'Tue', sessions: 6 },
-  { name: 'Wed', sessions: 3 },
-  { name: 'Thu', sessions: 8 },
-  { name: 'Fri', sessions: 5 },
+const defaultLevelDistribution = [
+  { name: 'Beginner', value: 0, color: '#ef4444' },
+  { name: 'Intermediate', value: 0, color: '#f97316' },
+  { name: 'Advanced', value: 0, color: '#22c55e' },
+  { name: 'Proficient', value: 0, color: '#8b5cf6' },
 ];
 
-const levelDistribution = [
-  { name: 'A1-A2', value: 15, color: '#ef4444' },
-  { name: 'B1', value: 35, color: '#f97316' },
-  { name: 'B2', value: 30, color: '#22c55e' },
-  { name: 'C1-C2', value: 20, color: '#8b5cf6' },
-];
+function normalizeDisplayScore(raw) {
+  if (raw == null || Number.isNaN(Number(raw))) return null;
+  const n = Number(raw);
+  if (n <= 10) return Math.round(n * 10);
+  return Math.round(Math.min(100, n));
+}
 
-const recentStudents = [
-  { id: 1, name: 'Hedi Goui', level: 'B2', lastSession: 'Today', status: 'Pending Review', avatar: '/images/hedi.jpg', score: 85, trend: '+5' },
-  { id: 2, name: 'Sarah Miller', level: 'B1', lastSession: 'Yesterday', status: 'Evaluated', avatar: null, score: 72, trend: '+3' },
-  { id: 3, name: 'Ahmed Hassan', level: 'B2', lastSession: '2 days ago', status: 'Pending Review', avatar: null, score: 78, trend: '+8' },
-  { id: 4, name: 'Emma Wilson', level: 'C1', lastSession: '3 days ago', status: 'Evaluated', avatar: null, score: 91, trend: '+2' },
-];
+function buildLast7DaysSessions(performances) {
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const buckets = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - i);
+    const dayStart = d.getTime();
+    const dayEnd = dayStart + 86400000;
+    const count = performances.filter((p) => {
+      const t = new Date(p.createdAt).getTime();
+      return t >= dayStart && t < dayEnd;
+    }).length;
+    buckets.push({ name: dayNames[d.getDay()], sessions: count });
+  }
+  return buckets;
+}
 
-const upcomingSessions = [
-  { id: 1, student: 'Hedi Goui', time: '10:00 AM', type: 'Live Session', initials: 'HG', color: '#E31837' },
-  { id: 2, student: 'Sarah Miller', time: '2:00 PM', type: 'Audio Review', initials: 'SM', color: '#3b82f6' },
-  { id: 3, student: 'John Doe', time: '4:30 PM', type: 'Live Session', initials: 'JD', color: '#8b5cf6' },
-];
+function sessionsInCurrentMonth(performances) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  return performances.filter((p) => {
+    const d = new Date(p.createdAt);
+    return d.getFullYear() === y && d.getMonth() === m;
+  }).length;
+}
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div style={{
-        background: 'rgba(15,15,26,0.92)', backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px',
-        padding: '0.6rem 0.85rem', boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
-      }}>
+      <div
+        style={{
+          background: 'rgba(15,15,26,0.92)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '12px',
+          padding: '0.6rem 0.85rem',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
+        }}
+      >
         <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', marginBottom: '0.2rem' }}>{label}</p>
         <p style={{ color: '#fff', fontSize: '0.9rem', fontWeight: '700' }}>{payload[0].value} sessions</p>
       </div>
@@ -48,113 +80,278 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  const [stats, setStats] = useState(null);
+  const [studentCount, setStudentCount] = useState(0);
+  const [recentSubmissions, setRecentSubmissions] = useState([]);
+  const [levelDistribution, setLevelDistribution] = useState(defaultLevelDistribution);
+  const [performances, setPerformances] = useState([]);
+  const [pendingQueue, setPendingQueue] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [scoreTrend, setScoreTrend] = useState(null);
+
+  const currentUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [currentUser?.id]);
+
+  const loadDashboardData = async () => {
+    try {
+      const instructorId = currentUser?.id;
+      if (!instructorId) {
+        setLoading(false);
+        return;
+      }
+
+      const [statsData, perfData, studentsResponse] = await Promise.all([
+        oralPerformanceService.getStatistics(instructorId),
+        oralPerformanceService.getInstructorPerformances(instructorId),
+        fetch('http://localhost:3000/users/students').then((res) => (res.ok ? res.json() : { data: [] })),
+      ]);
+
+      const list = perfData || [];
+      setPerformances(list);
+      setStats(statsData || null);
+      setStudentCount((studentsResponse?.data || []).length);
+
+      const sorted = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const recent = sorted.slice(0, 5);
+      const studentsById = Object.fromEntries((studentsResponse?.data || []).map((s) => [s._id?.toString?.(), s]));
+
+      const mapped = recent.map((item) => {
+        const student = studentsById[item.studentId];
+        const name = student
+          ? `${student.firstName || ''} ${student.lastName || ''}`.trim() || student.email
+          : item.studentId;
+        const sc = normalizeDisplayScore(item.totalScore);
+        return {
+          id: item._id,
+          studentId: item.studentId,
+          name: name || 'Student',
+          level: item.overallProficiency || '—',
+          lastSession: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—',
+          status: item.status === 'graded' ? 'Evaluated' : 'Pending Review',
+          score: sc != null ? sc : '—',
+        };
+      });
+      setRecentSubmissions(mapped);
+
+      const distribution = statsData?.proficiencyDistribution || {};
+      const total = Object.values(distribution).reduce((sum, value) => sum + Number(value || 0), 0);
+      const percentage = (value) => (total > 0 ? Math.round((Number(value || 0) / total) * 100) : 0);
+
+      setLevelDistribution([
+        { name: 'Beginner', value: percentage(distribution.beginner), color: '#ef4444' },
+        { name: 'Intermediate', value: percentage(distribution.intermediate), color: '#f97316' },
+        { name: 'Advanced', value: percentage(distribution.advanced), color: '#22c55e' },
+        { name: 'Proficient', value: percentage(distribution.proficient), color: '#8b5cf6' },
+      ]);
+
+      const graded = [...list]
+        .filter((p) => p.status === 'graded' && p.totalScore != null)
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      if (graded.length >= 2) {
+        const first = normalizeDisplayScore(graded[0].totalScore);
+        const last = normalizeDisplayScore(graded[graded.length - 1].totalScore);
+        if (first != null && last != null && first > 0) {
+          setScoreTrend(Math.round(((last - first) / first) * 100));
+        } else setScoreTrend(null);
+      } else setScoreTrend(null);
+
+      const queue = list
+        .filter((p) => p.status === 'pending' || p.status === 'in_progress')
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 4)
+        .map((p) => {
+          const student = studentsById[p.studentId];
+          const name = student
+            ? `${student.firstName || ''} ${student.lastName || ''}`.trim() || student.email
+            : p.studentId;
+          return {
+            id: p._id,
+            studentId: p.studentId,
+            title: (p.title || 'Session').slice(0, 36),
+            student: name || 'Student',
+            when: p.createdAt ? new Date(p.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—',
+          };
+        });
+      setPendingQueue(queue);
+    } catch (error) {
+      console.error('Failed to load teacher dashboard data', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const weeklyData = useMemo(() => buildLast7DaysSessions(performances), [performances]);
+  const monthSessions = useMemo(() => sessionsInCurrentMonth(performances), [performances]);
+  const avgNorm = normalizeDisplayScore(stats?.averageScore) ?? stats?.averageScore;
+
   return (
     <div className={styles.layout}>
       <TeacherSidebar />
       <div className={styles.mainContent}>
         <main className={styles.content}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+          <div className={teacherStyles.hero}>
+            <div className={teacherStyles.heroText}>
+              <span className={teacherStyles.heroKicker}>Instructor</span>
+              <h1 className={teacherStyles.heroTitle}>Your teaching hub</h1>
+              <p className={teacherStyles.heroSubtitle}>
+                Track sessions, proficiency spread, and students who need feedback—everything in one place.
+              </p>
+            </div>
+            <div className={teacherStyles.heroVisual} aria-hidden>
+              <div className={teacherStyles.heroOrb} />
+              <div className={teacherStyles.heroIconWrap}>
+                <ClipboardCheck size={36} strokeWidth={1.75} />
+              </div>
+            </div>
+          </div>
+
+          <div className={teacherStyles.headerRow}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#E31837', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Instructor</span>
-                <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Active</span>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: '600',
+                    color: '#E31837',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                  }}
+                >
+                  Overview
+                </span>
+                <span
+                  style={{
+                    width: '4px',
+                    height: '4px',
+                    borderRadius: '50%',
+                    background: '#22c55e',
+                    display: 'inline-block',
+                  }}
+                />
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Live data</span>
               </div>
-              <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1a1a2e', letterSpacing: '-0.03em', lineHeight: '1.2' }}>
-                Instructor Dashboard
-              </h1>
-              <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.3rem' }}>Manage your students and evaluations</p>
             </div>
-            <button style={{
-              padding: '0.65rem 1.3rem', background: 'linear-gradient(135deg, #E31837, #B71C1C)',
-              border: 'none', borderRadius: '14px', color: '#fff', fontWeight: '700', fontSize: '0.82rem',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
-              boxShadow: '0 4px 20px rgba(227,24,55,0.25)', fontFamily: 'inherit',
-            }}>
-              <Mic size={16} /> Start Live Session
+            <button type="button" className={teacherStyles.btnPrimary} onClick={() => navigate('/teacher/students')}>
+              <Mic size={16} /> View students
             </button>
           </div>
 
-          {/* Bento Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-            {/* Total Students - Accent */}
-            <div style={{
-              background: 'linear-gradient(135deg, #0f0f1a, #1a1a2e)', borderRadius: '20px',
-              padding: '1.25rem', position: 'relative', overflow: 'hidden', color: '#fff',
-            }}>
-              <div style={{ position: 'absolute', top: '-15px', right: '-15px', width: '70px', height: '70px', borderRadius: '50%', background: 'rgba(227,24,55,0.15)' }} />
+          {loading && <p className={teacherStyles.loadingLine}>Loading dashboard…</p>}
+
+          <div className={teacherStyles.bento4}>
+            <div className={teacherStyles.statDark}>
+              <div className={teacherStyles.statDarkAccent} />
               <Users size={20} style={{ opacity: 0.5, marginBottom: '0.75rem' }} />
-              <div style={{ fontSize: '2.2rem', fontWeight: '800', letterSpacing: '-0.04em', lineHeight: '1' }}>48</div>
-              <div style={{ fontSize: '0.72rem', opacity: 0.5, marginTop: '0.2rem', fontWeight: '500' }}>Total Students</div>
+              <div className={teacherStyles.statValueLight}>{studentCount}</div>
+              <div className={teacherStyles.statLabelLight}>Total students</div>
             </div>
 
-            {/* Pending Reviews */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.25rem',
-            }}>
+            <div className={teacherStyles.statGlass}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f97316' }}>
+                <div
+                  className={teacherStyles.iconBox}
+                  style={{ background: 'rgba(249,115,22,0.1)', color: '#f97316' }}
+                >
                   <ClipboardCheck size={18} />
                 </div>
-                <div style={{ padding: '0.15rem 0.5rem', background: 'rgba(249,115,22,0.08)', borderRadius: '6px', fontSize: '0.65rem', fontWeight: '700', color: '#f97316' }}>Urgent</div>
+                {stats?.pendingPerformances > 0 && (
+                  <div
+                    style={{
+                      padding: '0.15rem 0.5rem',
+                      background: 'rgba(249,115,22,0.08)',
+                      borderRadius: '6px',
+                      fontSize: '0.65rem',
+                      fontWeight: '700',
+                      color: '#f97316',
+                    }}
+                  >
+                    Action
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#1a1a2e', letterSpacing: '-0.04em', lineHeight: '1' }}>12</div>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem', fontWeight: '500' }}>Pending Reviews</div>
+              <div className={teacherStyles.statValue}>{stats?.pendingPerformances ?? 0}</div>
+              <div className={teacherStyles.statLabel}>Pending reviews</div>
             </div>
 
-            {/* Sessions This Month */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.25rem',
-            }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6', marginBottom: '0.75rem' }}>
+            <div className={teacherStyles.statGlass}>
+              <div
+                className={teacherStyles.iconBox}
+                style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', marginBottom: '0.75rem' }}
+              >
                 <Clock size={18} />
               </div>
-              <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#1a1a2e', letterSpacing: '-0.04em', lineHeight: '1' }}>156</div>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem', fontWeight: '500' }}>Sessions This Month</div>
+              <div className={teacherStyles.statValue}>{monthSessions}</div>
+              <div className={teacherStyles.statLabel}>Sessions this month</div>
             </div>
 
-            {/* Avg Improvement */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.25rem',
-            }}>
+            <div className={teacherStyles.statGlass}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e' }}>
+                <div
+                  className={teacherStyles.iconBox}
+                  style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}
+                >
                   <TrendingUp size={18} />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.68rem', fontWeight: '700', color: '#22c55e', background: 'rgba(34,197,94,0.08)', padding: '0.2rem 0.5rem', borderRadius: '6px' }}>
-                  <ArrowUpRight size={12} /> +5%
-                </div>
+                {scoreTrend != null && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.2rem',
+                      fontSize: '0.68rem',
+                      fontWeight: '700',
+                      color: scoreTrend >= 0 ? '#22c55e' : '#ef4444',
+                      background: scoreTrend >= 0 ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                      padding: '0.2rem 0.5rem',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    <ArrowUpRight size={12} /> {scoreTrend >= 0 ? '+' : ''}
+                    {scoreTrend}%
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#1a1a2e', letterSpacing: '-0.04em', lineHeight: '1' }}>87%</div>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem', fontWeight: '500' }}>Avg. Improvement</div>
+              <div className={teacherStyles.statValue}>{avgNorm != null ? `${avgNorm}` : '—'}</div>
+              <div className={teacherStyles.statLabel}>Avg. score (graded)</div>
             </div>
           </div>
 
-          {/* Charts Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 0.7fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            {/* Weekly Sessions Bar Chart */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem',
-            }}>
+          <div className={teacherStyles.gridCharts}>
+            <div className={teacherStyles.panel}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <div>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>Sessions This Week</h3>
-                  <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.15rem' }}>Daily session count</p>
+                  <h3 className={teacherStyles.panelTitle}>Sessions (last 7 days)</h3>
+                  <p className={teacherStyles.panelHint}>New performances per day</p>
                 </div>
-                <div style={{ padding: '0.3rem 0.75rem', background: 'rgba(0,0,0,0.03)', borderRadius: '8px', fontSize: '0.72rem', fontWeight: '600', color: '#64748b' }}>
-                  This Week
+                <div
+                  style={{
+                    padding: '0.3rem 0.75rem',
+                    background: 'rgba(0,0,0,0.03)',
+                    borderRadius: '8px',
+                    fontSize: '0.72rem',
+                    fontWeight: '600',
+                    color: '#64748b',
+                  }}
+                >
+                  Rolling week
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={weeklyData} barCategoryGap="30%">
                   <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
                   <XAxis dataKey="name" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(227,24,55,0.04)', radius: 8 }} />
                   <defs>
                     <linearGradient id="barGradInstructor" x1="0" y1="0" x2="0" y2="1">
@@ -167,13 +364,13 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </div>
 
-            {/* Level Distribution Donut */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem',
-              display: 'flex', flexDirection: 'column',
-            }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e', marginBottom: '0.5rem' }}>Level Distribution</h3>
+            <div className={teacherStyles.panel} style={{ display: 'flex', flexDirection: 'column' }}>
+              <h3 className={teacherStyles.panelTitle} style={{ marginBottom: '0.35rem' }}>
+                Proficiency mix
+              </h3>
+              <p className={teacherStyles.panelHint} style={{ marginBottom: '0.75rem' }}>
+                Among graded sessions
+              </p>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <ResponsiveContainer width="100%" height={140}>
                   <PieChart>
@@ -188,7 +385,9 @@ const Dashboard = () => {
                   {levelDistribution.map((item) => (
                     <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '3px', background: item.color }} />
-                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: '500' }}>{item.name} ({item.value}%)</span>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: '500' }}>
+                        {item.name} ({item.value}%)
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -196,84 +395,100 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Bottom Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.6fr', gap: '1rem' }}>
-            {/* Recent Students */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem',
-            }}>
+          <div className={teacherStyles.gridBottom}>
+            <div className={teacherStyles.panel}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>Recent Students</h3>
-                <span style={{ fontSize: '0.68rem', fontWeight: '600', color: '#E31837', cursor: 'pointer' }}>View all →</span>
+                <h3 className={teacherStyles.panelTitle} style={{ margin: 0 }}>
+                  Recent activity
+                </h3>
+                <button type="button" className={teacherStyles.linkAccent} onClick={() => navigate('/teacher/students')}>
+                  View all →
+                </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {recentStudents.map((student) => (
-                  <div key={student.id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '0.7rem 0.85rem', background: 'rgba(0,0,0,0.015)', borderRadius: '14px', cursor: 'pointer',
-                    transition: 'background 0.15s',
-                  }}>
+                {recentSubmissions.length === 0 && !loading && (
+                  <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>No sessions yet.</p>
+                )}
+                {recentSubmissions.map((student) => (
+                  <div
+                    key={student.id}
+                    role="button"
+                    tabIndex={0}
+                    className={teacherStyles.rowMuted}
+                    onClick={() => navigate(`/teacher/evaluate/${student.studentId}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/teacher/evaluate/${student.studentId}`)}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      {student.avatar ? (
-                        <img src={student.avatar} alt={student.name} style={{ width: '38px', height: '38px', borderRadius: '12px', objectFit: 'cover' }} />
-                      ) : (
-                        <div style={{
-                          width: '38px', height: '38px', borderRadius: '12px',
+                      <div
+                        style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '12px',
                           background: 'linear-gradient(135deg, #E31837, #B71C1C)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: 'white', fontWeight: '700', fontSize: '0.82rem',
-                        }}>{student.name.charAt(0)}</div>
-                      )}
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontWeight: '700',
+                          fontSize: '0.82rem',
+                        }}
+                      >
+                        {String(student.name).charAt(0).toUpperCase()}
+                      </div>
                       <div>
                         <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#1a1a2e' }}>{student.name}</div>
-                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Level {student.level} · {student.lastSession}</div>
+                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                          {student.level} · {student.lastSession}
+                        </div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1a1a2e' }}>{student.score}</div>
-                        <div style={{ fontSize: '0.62rem', fontWeight: '600', color: '#22c55e' }}>{student.trend}</div>
                       </div>
-                      <span style={{
-                        padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.62rem', fontWeight: '600',
-                        background: student.status === 'Pending Review' ? 'rgba(249,115,22,0.08)' : 'rgba(34,197,94,0.08)',
-                        color: student.status === 'Pending Review' ? '#f97316' : '#22c55e',
-                      }}>{student.status}</span>
+                      <span
+                        className={teacherStyles.badge}
+                        style={{
+                          background: student.status === 'Pending Review' ? 'rgba(249,115,22,0.08)' : 'rgba(34,197,94,0.08)',
+                          color: student.status === 'Pending Review' ? '#f97316' : '#22c55e',
+                        }}
+                      >
+                        {student.status}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Today's Schedule */}
-            <div style={{
-              background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem',
-            }}>
+            <div className={teacherStyles.panel}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>Today's Schedule</h3>
-                <Calendar size={16} style={{ color: '#94a3b8' }} />
+                <h3 className={teacherStyles.panelTitle} style={{ margin: 0 }}>
+                  Needs grading
+                </h3>
+                <ListTodo size={16} style={{ color: '#94a3b8' }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                {upcomingSessions.map((session) => (
-                  <div key={session.id} style={{
-                    padding: '0.85rem', background: 'rgba(0,0,0,0.015)', borderRadius: '14px',
-                    borderLeft: `3px solid ${session.color}`, cursor: 'pointer',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{
-                          width: '28px', height: '28px', borderRadius: '8px',
-                          background: `${session.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.6rem', fontWeight: '800', color: session.color,
-                        }}>{session.initials}</div>
-                        <span style={{ fontSize: '0.82rem', fontWeight: '600', color: '#1a1a2e' }}>{session.student}</span>
-                      </div>
+                {pendingQueue.length === 0 && !loading && (
+                  <p style={{ color: '#94a3b8', fontSize: '0.85rem', lineHeight: 1.5 }}>Nothing waiting—nice work.</p>
+                )}
+                {pendingQueue.map((item) => (
+                  <div
+                    key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    className={teacherStyles.rowMuted}
+                    style={{ borderLeft: '3px solid #E31837', cursor: 'pointer' }}
+                    onClick={() => navigate(`/teacher/evaluate/${item.studentId}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/teacher/evaluate/${item.studentId}`)}
+                  >
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#1a1a2e' }}>{item.student}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>{item.title}</div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: '2.15rem' }}>
-                      <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{session.type}</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#22c55e' }}>{session.time}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: '#64748b' }}>
+                      <Calendar size={14} />
+                      {item.when}
                     </div>
                   </div>
                 ))}

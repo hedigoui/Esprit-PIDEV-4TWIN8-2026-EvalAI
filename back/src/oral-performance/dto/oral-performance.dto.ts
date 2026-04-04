@@ -16,6 +16,10 @@ export class CreateOralPerformanceDto {
   studentId: string;
 
   @IsString()
+  @IsOptional()
+  instructorId?: string;
+
+  @IsString()
   @IsNotEmpty()
   title: string;
 
@@ -63,18 +67,25 @@ export class UpdateScoresDto {
 
 // src/oral-performance/dto/update-feedback.dto.ts
 export class UpdateFeedbackDto {
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  strengths: string[];
+  strengths?: string[];
 
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  weaknesses: string[];
+  weaknesses?: string[];
 
   @IsString()
   generalComments: string;
 
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  recommendations: string[];
+  recommendations?: string[];
+
+  @IsOptional()
+  @IsString()
+  cefrLevel?: string;
 }

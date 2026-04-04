@@ -1,96 +1,79 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import styles from './Login.module.css';
 
-const AuthCallback = () => {
+function parseUser(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(decodeURIComponent(raw));
+  } catch {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+}
+
+/**
+ * OAuth redirect target: backend sends token + user JSON in query params.
+ */
+export default function AuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [message, setMessage] = useState('Completing sign-in…');
 
   useEffect(() => {
     const token = searchParams.get('token');
-    const userParam = searchParams.get('user');
-    const errorParam = searchParams.get('error');
+    const userRaw = searchParams.get('user');
+    const err = searchParams.get('error');
 
-    if (errorParam) {
-      setError('Authentication failed. Please try again.');
-      setLoading(false);
-      setTimeout(() => {
-        navigate('/login');
-      }, 3000);
+    if (err) {
+      setMessage('Redirecting…');
+      navigate(`/?error=${encodeURIComponent(err)}`, { replace: true });
       return;
     }
 
-    if (token && userParam) {
-      try {
-        const user = JSON.parse(decodeURIComponent(userParam));
-        
-        // Store token and user data
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-
-        // Redirect based on user role
-        setTimeout(() => {
-          if (user.role === 'admin') {
-            navigate('/admin/dashboard');
-          } else if (user.role === 'instructor') {
-            navigate('/teacher/dashboard');
-          } else if (user.role === 'student') {
-            navigate('/student/dashboard');
-          } else {
-            navigate('/dashboard');
-          }
-        }, 100);
-      } catch {
-        setError('Invalid authentication data');
-        setLoading(false);
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
-      }
-    } else {
-      setError('Missing authentication data');
-      setLoading(false);
-      setTimeout(() => {
-        navigate('/login');
-      }, 3000);
+    if (!token || !userRaw) {
+      navigate('/?error=oauth_missing', { replace: true });
+      return;
     }
-  }, [searchParams, navigate]);
 
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        flexDirection: 'column',
-        fontFamily: 'Arial, sans-serif'
-      }}>
-        <div style={{ fontSize: '24px', marginBottom: '16px' }}>Authenticating...</div>
-        <div style={{ fontSize: '16px', color: '#666' }}>Please wait while we sign you in.</div>
+    const user = parseUser(userRaw);
+    if (!user?.id || !user?.role) {
+      navigate('/?error=oauth_invalid', { replace: true });
+      return;
+    }
+
+    if (!user.isActive) {
+      navigate('/?error=deactivated', { replace: true });
+      return;
+    }
+
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+
+    const role = user.role;
+    if (role === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+    } else if (role === 'instructor') {
+      navigate('/teacher/dashboard', { replace: true });
+    } else if (role === 'student') {
+      navigate('/student/dashboard', { replace: true });
+    } else {
+      navigate('/?error=oauth_role', { replace: true });
+    }
+  }, [navigate, searchParams]);
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.rightPanel} style={{ flex: 1, maxWidth: '100%' }}>
+        <div className={styles.formWrapper}>
+          <p className={styles.subtitle} style={{ textAlign: 'center' }}>
+            {message}
+          </p>
+        </div>
       </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        flexDirection: 'column',
-        fontFamily: 'Arial, sans-serif'
-      }}>
-        <div style={{ fontSize: '24px', marginBottom: '16px', color: '#e74c3c' }}>Authentication Error</div>
-        <div style={{ fontSize: '16px', color: '#666', marginBottom: '20px' }}>{error}</div>
-        <div style={{ fontSize: '14px', color: '#999' }}>Redirecting to login page...</div>
-      </div>
-    );
-  }
-
-  return null;
-};
-
-export default AuthCallback;
+    </div>
+  );
+}

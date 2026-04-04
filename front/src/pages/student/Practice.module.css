@@ -648,3 +648,348 @@
   50% { opacity: 0.5; }
   100% { opacity: 1; }
 }
+
+/* Hero */
+.practiceHero {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.75rem;
+  padding: 1.75rem 1.75rem 1.75rem 1.5rem;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(227, 24, 55, 0.06) 0%, rgba(15, 23, 42, 0.04) 45%, rgba(59, 130, 246, 0.05) 100%);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.06);
+}
+
+.heroText {
+  flex: 1;
+  min-width: 0;
+}
+
+.heroKicker {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #E31837;
+  margin-bottom: 0.35rem;
+}
+
+.heroTitle {
+  margin: 0 0 0.5rem;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+  line-height: 1.15;
+}
+
+.heroSubtitle {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #64748b;
+  max-width: 36rem;
+}
+
+.heroVisual {
+  position: relative;
+  width: 140px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heroOrb {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(227, 24, 55, 0.25), transparent 55%),
+    radial-gradient(circle at 70% 60%, rgba(59, 130, 246, 0.2), transparent 50%);
+  filter: blur(0.5px);
+}
+
+.heroIconWrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #fff, #f1f5f9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #E31837;
+  box-shadow: 0 8px 28px rgba(227, 24, 55, 0.15);
+}
+
+@media (max-width: 720px) {
+  .practiceHero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .heroVisual {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+.recordingTimer {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #E31837;
+  letter-spacing: 0.02em;
+}
+
+.existingRecording {
+  text-align: center;
+  padding: 1rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  color: #166534;
+}
+
+.existingRecording p {
+  margin: 0.25rem 0 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.sectionHeader h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.aiBadge {
+  margin-left: auto;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(227, 24, 55, 0.1);
+  color: #E31837;
+}
+
+.overallScore {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.overallScore > span:last-child {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.scoreCircle {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(102, 126, 234, 0.35);
+}
+
+.scoreCircle span:first-child {
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.scoreCircle small {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+.finalCefrContainer {
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  background: linear-gradient(180deg, #f8fafc, #fff);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.finalCefrContainer h4 {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.finalLevelDisplay {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.finalLevelCircle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #E31837, #b91c1c);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(227, 24, 55, 0.25);
+}
+
+.finalLevelValue {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.finalLevelScore {
+  font-size: 0.75rem;
+  opacity: 0.9;
+  margin-top: 0.25rem;
+}
+
+.levelBreakdown {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 160px;
+}
+
+.breakdownItem {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
+  background: #f1f5f9;
+  border-radius: 8px;
+  color: #475569;
+}
+
+.formGroup {
+  margin-bottom: 1rem;
+}
+
+.formGroup label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+
+.levelButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.levelBtn {
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  cursor: default;
+}
+
+.levelBtn.finalLevel {
+  border-color: #E31837;
+  background: rgba(227, 24, 55, 0.08);
+  color: #E31837;
+}
+
+.levelBtn.speechLevel {
+  border-color: #3b82f6;
+  color: #2563eb;
+}
+
+.levelBtn.geminiLevel {
+  border-color: #8b5cf6;
+  color: #7c3aed;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.68rem;
+  color: #64748b;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.finalDot,
+.speechDot,
+.contentDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.finalDot { background: #E31837; }
+.speechDot { background: #3b82f6; }
+.contentDot { background: #8b5cf6; }
+
+.aiMetrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.detailsBox {
+  font-size: 0.8rem;
+  color: #475569;
+  padding: 0.65rem 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  border: 1px solid #e2e8f0;
+}
+
+.contentScores {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #475569;
+  margin-top: 0.5rem;
+}
+
+.videoPreview {
+  background: linear-gradient(160deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+  border: 1px solid #e2e8f0;
+}

@@ -1,7 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
+import AuthCallback from './pages/AuthCallback';
 import Profile from './pages/Profile';
 import Conversations from './pages/Conversations';
+import Messages from './pages/Messages';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 // Student Pages
 import StudentDashboard from './pages/student/Dashboard';
@@ -30,9 +34,13 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/conversations" element={<Conversations />} />
+        <Route path="/messages/:userId" element={<Messages />} />
         {/* Student Routes */}
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/practice" element={<StudentPractice />} />

@@ -28,7 +28,14 @@ export class ReclamationsController {
   @Roles(UserRole.STUDENT)
   async create(
     @Req() req: Request & { user?: AuthUser },
-    @Body() body: { title: string; description: string; category?: string; studentName?: string },
+    @Body()
+    body: {
+      title: string;
+      description: string;
+      category?: string;
+      studentName?: string;
+      targetInstructorId?: string;
+    },
   ) {
     const studentId = req.user?.sub;
     const studentName = body.studentName || req.user?.email || 'Unknown';
@@ -40,9 +47,40 @@ export class ReclamationsController {
     );
   }
 
+  /** Instructors submit support tickets to admins only (not tied to a student). */
+  @Post('to-admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.INSTRUCTOR)
+  async createInstructorToAdmin(
+    @Req() req: Request & { user?: AuthUser },
+    @Body()
+    body: {
+      title: string;
+      description: string;
+      category?: string;
+      reporterName?: string;
+    },
+  ) {
+    const instructorId = req.user?.sub;
+    if (!instructorId) throw new BadRequestException('Invalid token payload');
+    const u = req.user;
+    const reporterName = (
+      body.reporterName?.trim() ||
+      `${u?.firstName || ''} ${u?.lastName || ''}`.trim() ||
+      u?.email ||
+      'Instructor'
+    ).trim();
+    return await this.reclamationsService.createInstructorToAdmin(
+      instructorId,
+      reporterName,
+      body,
+    );
+  }
+
+  /** Admin-only: file a reclamation on behalf of a student (legacy / internal). */
   @Post('teacher/:studentId')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.INSTRUCTOR, UserRole.ADMIN)
+  @Roles(UserRole.ADMIN)
   async createByTeacher(
     @Req() req: Request & { user?: AuthUser },
     @Param('studentId') studentId: string,
@@ -68,9 +106,18 @@ export class ReclamationsController {
     return await this.reclamationsService.findMine(studentId);
   }
 
+  @Get('instructor/me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.INSTRUCTOR)
+  async findInstructorInbox(@Req() req: Request & { user?: AuthUser }) {
+    const instructorId = req.user?.sub;
+    if (!instructorId) throw new BadRequestException('Invalid token payload');
+    return await this.reclamationsService.findInstructorInbox(instructorId);
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.INSTRUCTOR)
+  @Roles(UserRole.ADMIN)
   async findAll(@Query('status') status?: string) {
     const parsed = status ? this.parseStatus(status) : undefined;
     return await this.reclamationsService.findAll(parsed);
@@ -98,7 +145,7 @@ export class ReclamationsController {
 
   @Patch(':id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.INSTRUCTOR)
+  @Roles(UserRole.ADMIN)
   async updateStatus(
     @Req() req: Request & { user?: AuthUser },
     @Param('id') id: string,

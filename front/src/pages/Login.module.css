@@ -521,3 +521,71 @@
     transform: translateY(0);
   }
 }
+
+/* Dark theme (saved in Settings / localStorage, applied on <html>) */
+:global([data-theme='dark']) .rightPanel {
+  background: var(--bg-main);
+}
+
+:global([data-theme='dark']) .title {
+  color: var(--text-primary);
+}
+
+:global([data-theme='dark']) .subtitle {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .label {
+  color: var(--text-secondary);
+}
+
+:global([data-theme='dark']) .roleButton {
+  background: var(--bg-card-solid);
+  border-color: var(--border-light);
+  color: var(--text-secondary);
+}
+
+:global([data-theme='dark']) .activeRole {
+  background: var(--primary-soft);
+}
+
+:global([data-theme='dark']) .input {
+  background: var(--bg-card-solid);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+:global([data-theme='dark']) .input::placeholder {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .rememberMe {
+  color: var(--text-secondary);
+}
+
+:global([data-theme='dark']) .dividerLine {
+  background: var(--border-light);
+}
+
+:global([data-theme='dark']) .dividerText {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .socialButton {
+  background: var(--bg-card-solid);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+:global([data-theme='dark']) .signupLink {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .footer {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .inputIcon,
+:global([data-theme='dark']) .eyeButton {
+  color: var(--text-muted);
+}

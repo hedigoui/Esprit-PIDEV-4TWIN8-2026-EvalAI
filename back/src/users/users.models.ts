@@ -41,6 +41,9 @@ export class Users {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ default: false })
+  isTemporaryPassword: boolean;
+
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { oralPerformanceService, EvaluationResult } from '../pages/services/oralPerformance.service';
 
 interface UseEvaluationProps {
@@ -10,28 +10,77 @@ export const useEvaluation = ({ performanceId, autoPoll = true }: UseEvaluationP
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pollingInterval, setPollingInterval] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const startEvaluation = async (subject: string) => {
-    if (!performanceId) {
-      setError('No performance ID available');
-      return;
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      window.clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const fetchEvaluationForPerformance = useCallback(
+    async (id: string) => {
+      if (!id) return;
+
+      try {
+        const result = await oralPerformanceService.getEvaluation(id);
+
+        if (result) {
+          setEvaluation(result);
+          setError(null);
+
+          if (result.status === 'completed' || result.status === 'failed') {
+            stopPolling();
+          }
+        }
+
+        return result;
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        if (!errorMsg.includes('404')) {
+          console.debug('Polling evaluation:', errorMsg);
+        }
+      }
+    },
+    [stopPolling],
+  );
+
+  const startPolling = useCallback(
+    (id: string) => {
+      stopPolling();
+      pollingRef.current = window.setInterval(() => {
+        void fetchEvaluationForPerformance(id);
+      }, 3000);
+    },
+    [stopPolling, fetchEvaluationForPerformance],
+  );
+
+  /**
+   * @param overridePerformanceId — pass after create/upload so the API runs before React
+   *   re-renders with the new `performanceId` (fixes "first click does nothing").
+   */
+  const startEvaluation = async (subject: string, overridePerformanceId?: string) => {
+    const id = overridePerformanceId ?? performanceId;
+    if (!id) {
+      throw new Error('No performance ID');
     }
 
     try {
       setIsLoading(true);
       setError(null);
-      
-      const result = await oralPerformanceService.startEvaluation(performanceId, subject);
+
+      const result = await oralPerformanceService.startEvaluation(id, subject);
       setEvaluation(result);
-      
+
       if (autoPoll && result && result.status === 'processing') {
-        startPolling();
+        startPolling(id);
       }
-      
+
       return result;
-    } catch (err: any) {
-      setError(err.message || 'Failed to start evaluation');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to start evaluation';
+      setError(message);
       console.error(err);
       throw err;
     } finally {
@@ -41,56 +90,22 @@ export const useEvaluation = ({ performanceId, autoPoll = true }: UseEvaluationP
 
   const fetchEvaluation = async () => {
     if (!performanceId) return;
-
-    try {
-      const result = await oralPerformanceService.getEvaluation(performanceId);
-      
-      if (result) {
-        setEvaluation(result);
-        setError(null);
-        
-        if (result.status === 'completed' || result.status === 'failed') {
-          stopPolling();
-        }
-      }
-      // If result is null, it means evaluation not found yet - keep polling
-      
-      return result;
-    } catch (err: any) {
-      // Log non-404 errors but don't set them as UI errors during polling
-      const errorMsg = err?.message || 'Unknown error';
-      if (!errorMsg.includes('404')) {
-        console.debug('Polling evaluation:', errorMsg);
-      }
-    }
-  };
-
-  const startPolling = () => {
-    stopPolling();
-    const interval = window.setInterval(fetchEvaluation, 3000);
-    setPollingInterval(interval);
-  };
-
-  const stopPolling = () => {
-    if (pollingInterval) {
-      window.clearInterval(pollingInterval);
-      setPollingInterval(null);
-    }
+    return fetchEvaluationForPerformance(performanceId);
   };
 
   useEffect(() => {
-    return () => {
-      if (pollingInterval) {
-        window.clearInterval(pollingInterval);
-      }
-    };
-  }, [pollingInterval]);
+    return () => stopPolling();
+  }, [stopPolling]);
 
   useEffect(() => {
-    if (performanceId) {
-      fetchEvaluation();
+    if (!performanceId) {
+      setError(null);
+      setEvaluation(null);
+      stopPolling();
+      return;
     }
-  }, [performanceId]);
+    void fetchEvaluationForPerformance(performanceId);
+  }, [performanceId, fetchEvaluationForPerformance, stopPolling]);
 
   return {
     evaluation,

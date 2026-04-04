@@ -93,6 +93,25 @@ export const useAudioRecorder = () => {
     audioChunksRef.current = [];
   };
 
+  /** Use uploaded file as the current take (durationSec used for upload → evaluation). */
+  const loadExternalAudio = (blob: Blob, durationSec?: number) => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingTime(
+      typeof durationSec === 'number' && durationSec > 0
+        ? Math.floor(durationSec)
+        : 0,
+    );
+    setAudioBlob(blob);
+    setAudioUrl(URL.createObjectURL(blob));
+    setError(null);
+    audioChunksRef.current = [];
+  };
+
   const formattedTime = `${String(Math.floor(recordingTime / 60)).padStart(2, '0')}:${String(recordingTime % 60).padStart(2, '0')}`;
 
   return {
@@ -105,5 +124,6 @@ export const useAudioRecorder = () => {
     startRecording,
     stopRecording,
     resetRecording,
+    loadExternalAudio,
   };
 };

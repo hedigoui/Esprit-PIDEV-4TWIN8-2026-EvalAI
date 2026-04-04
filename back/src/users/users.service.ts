@@ -441,6 +441,7 @@ export class UsersService {
       lastName: string;
       role: UserRole;
       isActive: boolean;
+      isTemporaryPassword: boolean;
     };
   }> {
     try {
@@ -482,6 +483,7 @@ export class UsersService {
           lastName: user.lastName,
           role: user.role,
           isActive: user.isActive,
+          isTemporaryPassword: user.isTemporaryPassword || false,
         },
       };
     } catch (error) {
@@ -517,8 +519,9 @@ export class UsersService {
       // Hash the new password
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-      // Update user password immediately
+      // Update user password immediately with temporary flag
       user.password = hashedPassword;
+      user.isTemporaryPassword = true;
       user.updatedAt = new Date();
       await this.userRepository.save(user);
 
@@ -543,6 +546,61 @@ export class UsersService {
       };
     } catch (error) {
       console.error('❌ Error in forgotPassword method:', error);
+      throw error;
+    }
+  }
+
+  async changeTemporaryPassword(
+    userId: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    try {
+      console.log('🔐 Change temporary password request for user ID:', userId);
+
+      if (!newPassword) {
+        throw new BadRequestException(
+          'New password is required',
+        );
+      }
+
+      if (newPassword.length < 6) {
+        throw new BadRequestException(
+          'New password must be at least 6 characters',
+        );
+      }
+
+      if (!ObjectId.isValid(userId)) {
+        throw new BadRequestException('Invalid user ID format');
+      }
+
+      // Find user
+      const user = await this.userRepository.findOneBy({
+        _id: new ObjectId(userId),
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (!user.isTemporaryPassword) {
+        throw new BadRequestException(
+          'Password change not required for this user',
+        );
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password and clear temporary flag
+      user.password = hashedPassword;
+      user.isTemporaryPassword = false;
+      user.updatedAt = new Date();
+      await this.userRepository.save(user);
+
+      console.log('✅ Temporary password changed successfully for user:', user.email);
+      return { message: 'Password has been changed successfully.' };
+    } catch (error) {
+      console.error('❌ Error in changeTemporaryPassword method:', error);
       throw error;
     }
   }

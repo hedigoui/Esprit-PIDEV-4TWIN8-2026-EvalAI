@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
+import session from 'express-session';
+import passport from 'passport';
 
 // Load environment variables immediately
 dotenv.config();
@@ -20,7 +22,31 @@ console.log(
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+  app.use(
+    session({
+      secret:
+        process.env.SESSION_SECRET ||
+        process.env.JWT_SECRET ||
+        'dev-session-secret-change-me',
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 15 * 60 * 1000,
+        httpOnly: true,
+        sameSite: 'lax',
+      },
+    }),
+  );
+  app.use(passport.initialize());
+  passport.serializeUser((user: any, done) => {
+    done(null, user);
+  });
+  passport.deserializeUser((user: any, done) => {
+    done(null, user);
+  });
+  app.use(passport.session());
+
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
   app.enableCors({
     origin: [frontendUrl, 'http://localhost:3001', 'http://localhost:5173'],

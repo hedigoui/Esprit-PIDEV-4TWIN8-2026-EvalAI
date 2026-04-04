@@ -15,17 +15,26 @@ export class OAuthService {
   async validateOAuthUser(profile: any): Promise<any> {
     const { email, firstName, lastName, provider: _provider } = profile;
 
+    if (!email || typeof email !== 'string') {
+      throw new Error('OAUTH_NO_EMAIL');
+    }
+
     let user = await this.userRepository.findOneBy({ email });
 
+    if (user && !user.isActive) {
+      throw new Error('OAUTH_INACTIVE');
+    }
+
     if (!user) {
-      // Create new user if doesn't exist
+      const fn = (firstName && String(firstName).trim()) || 'User';
+      const ln = (lastName && String(lastName).trim()) || '';
       user = await this.userRepository.save({
         email,
-        firstName,
-        lastName,
-        role: UserRole.STUDENT, // Default role for OAuth users
-        isActive: true, // OAuth users are auto-activated
-        password: '', // OAuth users don't have passwords
+        firstName: fn,
+        lastName: ln,
+        role: UserRole.STUDENT,
+        isActive: true,
+        password: '',
         createdAt: new Date(),
         updatedAt: new Date(),
       });

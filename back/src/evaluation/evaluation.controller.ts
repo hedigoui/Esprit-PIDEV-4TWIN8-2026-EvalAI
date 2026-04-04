@@ -18,4 +18,9 @@ export class EvaluationController {
   async getEvaluation(@Param('performanceId') performanceId: string) {
     return this.evaluationService.getEvaluation(performanceId);
   }
+
+  @Get('student/:studentId')
+  async getStudentEvaluations(@Param('studentId') studentId: string) {
+    return this.evaluationService.getAllEvaluationsForStudent(studentId);
+  }
 }

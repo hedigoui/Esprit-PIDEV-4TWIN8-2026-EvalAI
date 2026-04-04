@@ -13,6 +13,8 @@ import {
 import { AssemblyAIService } from '../assemblyai/assemblyai.service';
 import { GridFSService } from '../gridfs/gridfs.service';
 import { DeepSeekService } from '../deepseek/deepseek.service';
+import { GeminiService } from '../gemini/gemini.service';
+import { deriveCefrLevel } from './cefr-calibration.util';
 
 @Injectable()
 export class EvaluationService {
@@ -26,6 +28,7 @@ export class EvaluationService {
     private assemblyAIService: AssemblyAIService,
     private gridFSService: GridFSService,
     private deepseekService: DeepSeekService,
+    private geminiService: GeminiService,
   ) {}
 
   async evaluatePerformance(performanceId: string, subject: string) {
@@ -101,20 +104,54 @@ export class EvaluationService {
           this.logger.log('Calling DeepSeek for content evaluation...');
 
           try {
-            const contentResult =
-              await this.deepseekService.evaluateContent(
+            const outcome = await this.deepseekService.evaluateContent(
+              assemblyResult.transcript,
+              subject,
+              'en', // Default to English, can be detected later
+              'encouraging',
+              assemblyResult.metrics,
+            );
+
+            let contentResult = outcome.data;
+            if (!outcome.llmSucceeded && this.geminiService.isAvailable()) {
+              this.logger.warn(
+                'DeepSeek did not yield validated LLM narrative; trying Gemini backup...',
+              );
+              const gemini = await this.geminiService.tryEvaluateBackup(
                 assemblyResult.transcript,
                 subject,
-                'en', // Default to English, can be detected later
+                'en',
+                assemblyResult.metrics,
               );
+              if (gemini) {
+                contentResult = gemini;
+                this.logger.log('✅ Content narrative from Gemini backup');
+              } else {
+                this.logger.warn(
+                  'Gemini backup unavailable or rejected output; using transcript-grounded heuristic narrative',
+                );
+              }
+            } else if (!outcome.llmSucceeded) {
+              this.logger.warn(
+                'Using transcript-grounded heuristic narrative (no LLM validation passed)',
+              );
+            }
 
-            // Add content results to evaluation
             evaluation.contentScores = contentResult.scores;
-            evaluation.contentAnalysis = contentResult.analysis;
+            const calibratedCefr = deriveCefrLevel(
+              contentResult.scores,
+              assemblyResult.metrics,
+            );
+            evaluation.contentAnalysis = {
+              ...contentResult.analysis,
+              cefrLevel: calibratedCefr,
+            };
             evaluation.detailedContentFeedback =
               contentResult.detailedFeedback;
 
-            this.logger.log('✅ Content evaluation completed');
+            this.logger.log(
+              `✅ Content evaluation completed (CEFR ${calibratedCefr} from scores + speech metrics)`,
+            );
           } catch (deepseekError) {
             this.logger.error(
               `DeepSeek evaluation failed: ${deepseekError.message}`,
@@ -281,6 +318,8 @@ export class EvaluationService {
           title: performance.title,
           createdAt: performance.createdAt,
           status: performance.status,
+          totalScore: performance.totalScore,
+          overallProficiency: performance.overallProficiency,
           audioFile: performance.audioFile,
         },
         evaluation: evaluation

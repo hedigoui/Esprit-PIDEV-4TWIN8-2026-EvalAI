@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import AdminSidebar from '../../components/AdminSidebar';
 import { Shield, Database, Bell, Globe, Lock, Server } from 'lucide-react';
 import styles from '../../styles/shared.module.css';
 import settingsStyles from '../student/Settings.module.css';
+import { getStoredTheme, setStoredTheme } from '../../theme';
 
 const Settings = () => {
+  const [darkMode, setDarkMode] = useState(() => getStoredTheme() === 'dark');
+
   return (
     <div className={styles.layout}>
       <AdminSidebar />
@@ -47,6 +51,25 @@ const Settings = () => {
                   <option>UTC+2 (Cairo)</option>
                   <option>UTC-5 (New York)</option>
                 </select>
+              </div>
+
+              <div className={settingsStyles.toggleItem}>
+                <div>
+                  <h4>Dark mode</h4>
+                  <p>Use dark theme in this browser</p>
+                </div>
+                <label className={settingsStyles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={darkMode}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setDarkMode(on);
+                      setStoredTheme(on ? 'dark' : 'light');
+                    }}
+                  />
+                  <span className={settingsStyles.slider}></span>
+                </label>
               </div>
 
               <button className={styles.primaryButton}>Save Changes</button>

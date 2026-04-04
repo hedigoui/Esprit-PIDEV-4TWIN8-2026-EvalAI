@@ -7,6 +7,7 @@ import { OralPerformance } from '../oral-performance/oral-performance.entity';
 import { AssemblyAIModule } from '../assemblyai/assemblyai.module';
 import { GridFSModule } from '../gridfs/gridfs.module';
 import { DeepSeekModule } from '../deepseek/deepseek.module';
+import { GeminiModule } from '../gemini/gemini.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { DeepSeekModule } from '../deepseek/deepseek.module';
     AssemblyAIModule,
     GridFSModule,
     DeepSeekModule,
+    GeminiModule,
   ],
   controllers: [EvaluationController],
   providers: [EvaluationService],

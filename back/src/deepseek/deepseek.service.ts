@@ -1,8 +1,8 @@
-// backend/src/deepseek/deepseek.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
+import type { SpeechMetrics } from '../assemblyai/interfaces/assemblyai.types';
 
-export interface DeepSeekEvaluationResult {
+interface DeepSeekEvaluationResult {
   scores: {
     contentStructure: number;
     coherence: number;
@@ -24,6 +24,16 @@ export interface DeepSeekEvaluationResult {
   };
 }
 
+interface DeepSeekEvaluateOutcome {
+  data: DeepSeekEvaluationResult;
+  /** False when API/parse/validation failed and heuristic fallback was used */
+  llmSucceeded: boolean;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 @Injectable()
 export class DeepSeekService {
   private readonly logger = new Logger(DeepSeekService.name);
@@ -39,83 +49,259 @@ export class DeepSeekService {
       );
     }
 
-    this.apiKey = apiKey; // Now TypeScript knows this is definitely a string
+    this.apiKey = apiKey;
     this.logger.log('✅ DeepSeek service initialized');
   }
 
+  /**
+   * Calls DeepSeek with retries and strict narrative checks.
+   * If all attempts fail, returns transcript-grounded heuristic data with llmSucceeded: false.
+   */
   async evaluateContent(
     transcript: string,
     subject: string,
     language: 'en' | 'fr' = 'en',
     mode: 'strict' | 'encouraging' = 'encouraging',
-  ): Promise<DeepSeekEvaluationResult> {
+    speechMetrics?: SpeechMetrics,
+  ): Promise<DeepSeekEvaluateOutcome> {
     this.logger.log(`🤖 Evaluating content with DeepSeek (${mode} mode)`);
     this.logger.log(`Subject: "${subject}"`);
     this.logger.log(`Transcript length: ${transcript.length} characters`);
 
-    const prompt = this.buildPrompt(transcript, subject, language, mode);
+    const prompt = this.buildPrompt(
+      transcript,
+      subject,
+      language,
+      mode,
+      speechMetrics,
+    );
 
-    try {
-      const startTime = Date.now();
-
-      const response = await axios.post(
-        this.apiUrl,
-        {
-          model: 'deepseek-chat',
-          messages: [
-            {
-              role: 'system',
-              content:
-                mode === 'encouraging'
-                  ? 'You are an encouraging language teacher. Be supportive and constructive in your feedback. Focus on what the student did right while providing helpful suggestions.'
-                  : 'You are a strict language evaluator. Be precise and critical in your assessment.',
-            },
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          temperature: 0.3,
-          max_tokens: 1000,
-          response_format: { type: 'json_object' },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-
-      const processingTime = Date.now() - startTime;
-      this.logger.log(`✅ DeepSeek response received in ${processingTime}ms`);
-
-      const content = response.data.choices[0].message.content;
-
-      // Extract JSON from response
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON found in response');
-      }
-
-      const evaluationResult = JSON.parse(jsonMatch[0]);
-      this.validateResult(evaluationResult);
-
-      this.logger.log(`📊 Content scores:`, evaluationResult.scores);
-      this.logger.log(`📈 CEFR Level: ${evaluationResult.analysis.cefrLevel}`);
-
-      return evaluationResult;
-    } catch (error) {
-      this.logger.error(`❌ DeepSeek evaluation failed: ${error.message}`);
-      if (error.response) {
-        this.logger.error(
-          `DeepSeek API error: ${JSON.stringify(error.response.data)}`,
+    let lastErr = '';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const content = await this.callDeepSeekApi(prompt, mode);
+        const raw = this.parseJsonFromModelContent(content);
+        const data = this.normalizeEvaluationResult(raw);
+        this.validateNarrativeQuality(data);
+        this.logger.log(`✅ DeepSeek OK (attempt ${attempt + 1})`);
+        return { data, llmSucceeded: true };
+      } catch (e: any) {
+        lastErr = e?.message || String(e);
+        this.logger.warn(
+          `DeepSeek attempt ${attempt + 1}/3 failed: ${lastErr}`,
         );
+        if (attempt < 2) await sleep(500 * (attempt + 1));
       }
-
-      // Return fallback evaluation if API fails
-      return this.fallbackEvaluation(transcript, subject);
     }
+
+    this.logger.error(
+      `❌ DeepSeek exhausted retries — using transcript-grounded fallback. Last error: ${lastErr}`,
+    );
+    return {
+      data: this.fallbackEvaluation(transcript, subject, speechMetrics),
+      llmSucceeded: false,
+    };
+  }
+
+  private async callDeepSeekApi(
+    prompt: string,
+    mode: 'strict' | 'encouraging',
+  ): Promise<string> {
+    const startTime = Date.now();
+    const response = await axios.post(
+      this.apiUrl,
+      {
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content:
+              mode === 'encouraging'
+                ? 'You are a senior CEFR oral-assessment specialist writing feedback for instructors. Numeric scores should be fair and motivating when the learner genuinely engages with the task. The written analysis (summary, keyPoints, strengths, improvements, detailedFeedback) must be analytically strong: every point must be grounded in the transcript or in the delivery metrics provided—cite ideas, structures, or errors the learner actually used; avoid generic praise or vague tips that could apply to any response. Output must be a single valid JSON object only.'
+                : 'You are a strict CEFR oral-assessment specialist. Be precise and critical in scores and in written analysis; still ground every written claim in the transcript or delivery metrics. Output must be a single valid JSON object only.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.25,
+        max_tokens: 4096,
+        response_format: { type: 'json_object' },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 120_000,
+        validateStatus: () => true,
+      },
+    );
+
+    if (response.status < 200 || response.status >= 300) {
+      const body =
+        typeof response.data === 'object'
+          ? JSON.stringify(response.data)
+          : String(response.data);
+      throw new Error(`DeepSeek HTTP ${response.status}: ${body}`);
+    }
+
+    const content = response.data?.choices?.[0]?.message?.content;
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new Error('Empty DeepSeek message content');
+    }
+
+    this.logger.log(
+      `DeepSeek response received in ${Date.now() - startTime}ms`,
+    );
+    return content;
+  }
+
+  private parseJsonFromModelContent(content: string): unknown {
+    let t = content.trim();
+    if (t.startsWith('```')) {
+      t = t
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```\s*$/i, '')
+        .trim();
+    }
+    const jsonMatch = t.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON object in model response');
+    }
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch {
+      throw new Error('JSON.parse failed on model output');
+    }
+  }
+
+  private toScoreRequired(name: string, v: unknown): number {
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      return Math.round(Math.max(0, Math.min(100, v)));
+    }
+    if (typeof v === 'string' && v.trim() !== '') {
+      const x = parseFloat(v.trim().replace(/,/g, ''));
+      if (Number.isFinite(x)) {
+        return Math.round(Math.max(0, Math.min(100, x)));
+      }
+    }
+    throw new Error(`Invalid score for ${name}`);
+  }
+
+  private normalizeStringArray(v: unknown, max: number): string[] {
+    if (!Array.isArray(v)) return [];
+    return v
+      .map((x) => String(x).trim())
+      .filter(Boolean)
+      .slice(0, max);
+  }
+
+  private normalizeEvaluationResult(raw: any): DeepSeekEvaluationResult {
+    const scores = raw?.scores ?? {};
+    const analysis = raw?.analysis ?? {};
+    const df = raw?.detailedFeedback ?? {};
+
+    return {
+      scores: {
+        contentStructure: this.toScoreRequired(
+          'contentStructure',
+          scores.contentStructure,
+        ),
+        coherence: this.toScoreRequired('coherence', scores.coherence),
+        topicRelevance: this.toScoreRequired(
+          'topicRelevance',
+          scores.topicRelevance,
+        ),
+        grammar: this.toScoreRequired('grammar', scores.grammar),
+        vocabulary: this.toScoreRequired('vocabulary', scores.vocabulary),
+      },
+      analysis: {
+        summary: String(analysis.summary ?? '').trim(),
+        keyPoints: this.normalizeStringArray(analysis.keyPoints, 8),
+        strengths: this.normalizeStringArray(analysis.strengths, 8),
+        improvements: this.normalizeStringArray(analysis.improvements, 8),
+        cefrLevel: 'B1',
+      },
+      detailedFeedback: {
+        structure: String(df.structure ?? '').trim(),
+        contentGaps: this.normalizeStringArray(df.contentGaps, 8),
+        vocabularySuggestions: this.normalizeStringArray(
+          df.vocabularySuggestions,
+          8,
+        ),
+      },
+    };
+  }
+
+  private validateScores(data: DeepSeekEvaluationResult): void {
+    const requiredScores = [
+      'contentStructure',
+      'coherence',
+      'topicRelevance',
+      'grammar',
+      'vocabulary',
+    ] as const;
+    for (const k of requiredScores) {
+      const n = data.scores[k];
+      if (typeof n !== 'number' || Number.isNaN(n)) {
+        throw new Error(`Missing score: ${k}`);
+      }
+    }
+  }
+
+  /** Reject boilerplate / truncated narratives so we retry instead of accepting weak output */
+  private validateNarrativeQuality(data: DeepSeekEvaluationResult): void {
+    const { summary, keyPoints, strengths, improvements } = data.analysis;
+    if (summary.length < 50) {
+      throw new Error('Summary too short or empty');
+    }
+    if (keyPoints.length < 3) {
+      throw new Error('Need at least 3 keyPoints');
+    }
+    const tooShort = (s: string) => s.trim().length < 18;
+    if (keyPoints.some(tooShort)) {
+      throw new Error('keyPoints too short (need substantive phrases)');
+    }
+    if (strengths.length < 3 || improvements.length < 3) {
+      throw new Error('Need at least 3 strengths and 3 improvements');
+    }
+    if (strengths.some(tooShort) || improvements.some(tooShort)) {
+      throw new Error('strengths/improvements too vague');
+    }
+
+    const banned = [
+      /^good effort to address the topic$/i,
+      /^provides basic information$/i,
+      /^clear and understandable speech$/i,
+      /^add more specific details to enrich your response$/i,
+      /^use more varied vocabulary$/i,
+      /^practice structuring your response with clear paragraphs$/i,
+      /^personal information$/i,
+      /^interests and family$/i,
+    ];
+    const allBullets = [...keyPoints, ...strengths, ...improvements];
+    for (const line of allBullets) {
+      for (const re of banned) {
+        if (re.test(line.trim())) {
+          throw new Error('Boilerplate bullet detected — retry');
+        }
+      }
+    }
+  }
+
+  private formatSpeechMetricsBlock(m?: SpeechMetrics): string {
+    if (!m) return '';
+    const d = m.details;
+    return `
+
+DELIVERY METRICS (from automatic audio analysis — use these to align your CEFR judgment and to mention delivery in analysis when relevant; do not invent numbers):
+- Fluency (0–100): ${m.fluency}
+- Pronunciation (0–100): ${m.pronunciation}
+- Speaking pace score (0–100): ${m.speakingPace}
+- Confidence (0–100): ${m.confidence}
+- Words per minute: ${d?.wordsPerMinute ?? 'n/a'}
+- Filler words (count): ${d?.fillerWords ?? 'n/a'}
+- Average pause duration (seconds): ${d?.averagePauseDuration ?? 'n/a'}
+- Total words (approx.): ${d?.totalWords ?? 'n/a'}`;
   }
 
   private buildPrompt(
@@ -123,7 +309,10 @@ export class DeepSeekService {
     subject: string,
     language: 'en' | 'fr',
     mode: 'strict' | 'encouraging',
+    speechMetrics?: SpeechMetrics,
   ): string {
+    const metricsBlock = this.formatSpeechMetricsBlock(speechMetrics);
+
     const scoringGuide =
       mode === 'encouraging'
         ? `SCORING PHILOSOPHY: You are an encouraging language teacher.
@@ -144,6 +333,7 @@ ${scoringGuide}
 
 Sujet donné: "${subject}"
 Transcription de l'étudiant: "${transcript}"
+${metricsBlock}
 
 Évalue selon ces critères (0-100):
 
@@ -156,25 +346,27 @@ Transcription de l'étudiant: "${transcript}"
 Pour la pertinence du sujet, sois GÉNÉREUX. Si l'étudiant fait un effort pour répondre, donne 70-90.
 Une auto-présentation qui inclut nom, origine, éducation, loisirs et famille mérite 85-95.
 
-Fournis aussi:
-- resume: résumé concis
-- pointsCles: 2-3 points principaux
-- forces: 3 points positifs spécifiques
-- ameliorations: 3 suggestions constructives
-- niveauCECRL: A1, A2, B1, B2, C1, ou C2
-- structureFeedback: commentaire sur l'organisation
-- lacunesContenu: points importants manquants
-- suggestionsVocabulaire: alternatives plus précises
+QUALITÉ DU COMMENTAIRE (pour les enseignants) — utilise les champs JSON anglais ci-dessous:
+- summary: 2–4 phrases, ancrées dans la transcription et cohérentes avec les métriques de parole si fournies.
+- keyPoints: 4–6 éléments tirés du contenu réel de la transcription.
+- strengths / improvements: 4–6 chacun, concrets, sans généralités vagues.
+- detailedFeedback: structure, lacunes, suggestions de vocabulaire — toujours liés à ce que l'apprenant a dit.
 
-Retourne UNIQUEMENT le JSON.`;
+Retourne UNIQUEMENT ce JSON (clés en anglais comme ci-dessous):
+{
+  "scores": { "contentStructure": number, "coherence": number, "topicRelevance": number, "grammar": number, "vocabulary": number },
+  "analysis": { "summary": "string", "keyPoints": ["string"], "strengths": ["string"], "improvements": ["string"], "cefrLevel": "B1" },
+  "detailedFeedback": { "structure": "string", "contentGaps": ["string"], "vocabularySuggestions": ["string"] }
+}`;
     }
 
     return `You are a language evaluation expert for English learners.
 
 ${scoringGuide}
 
-Subject: "${subject}"
-Student transcript: "${transcript}"
+Subject / task: "${subject}"
+Student transcript (verbatim): "${transcript}"
+${metricsBlock}
 
 IMPORTANT SCORING GUIDELINES:
 
@@ -191,17 +383,17 @@ Evaluate on these criteria (0-100):
 4. grammar: Grammatical accuracy
 5. vocabulary: Word choice and variety
 
-Also provide:
-- summary: brief 1-sentence summary
-- keyPoints: 2-3 main points covered
-- strengths: 3 specific positive points
-- improvements: 3 concrete suggestions
-- cefrLevel: A1, A2, B1, B2, C1, or C2
-- structure: feedback on organization
-- contentGaps: important missing points
-- vocabularySuggestions: more precise alternatives
+NARRATIVE QUALITY (critical — instructors read this; weak generic text is unacceptable):
+- summary: 2–4 full sentences. Say what the learner actually argued or described and how it relates to the subject. If delivery metrics are provided, mention pace/fluency/fillers only when consistent with the transcript.
+- keyPoints: 4–6 items. Each MUST paraphrase a distinct idea that appears in the transcript (not the subject line alone, not placeholder topics).
+- strengths: 4–6 items. Reference concrete wording, structures, or ideas from the transcript OR cite delivery metrics explicitly (e.g. WPM, fillers).
+- improvements: 4–6 items. Target observable issues in the transcript (grammar patterns, logic gaps, thin development, repetition) or delivery metrics.
+- detailedFeedback.structure: 2–5 sentences about spoken discourse organization.
+- detailedFeedback.contentGaps: what a stronger answer to THIS subject would still add.
+- detailedFeedback.vocabularySuggestions: tie suggestions to words the learner actually used.
+- cefrLevel: any A1–C2 (server recalibrates from your scores)
 
-Return ONLY this JSON:
+Return ONLY this JSON (no markdown, no commentary):
 {
   "scores": {
     "contentStructure": number,
@@ -225,127 +417,270 @@ Return ONLY this JSON:
 }`;
   }
 
-  private validateResult(result: any) {
-    if (!result.scores || !result.analysis || !result.detailedFeedback) {
-      throw new Error('Invalid result structure from DeepSeek');
-    }
-
-    const requiredScores = [
-      'contentStructure',
-      'coherence',
-      'topicRelevance',
-      'grammar',
-      'vocabulary',
-    ];
-    for (const score of requiredScores) {
-      if (typeof result.scores[score] !== 'number') {
-        throw new Error(`Missing or invalid score: ${score}`);
-      }
-    }
-
-    return true;
-  }
-
+  /** When LLMs fail: still derive bullets FROM the transcript + metrics (no fake "Personal information" rows). */
   private fallbackEvaluation(
     transcript: string,
     subject: string,
+    speechMetrics?: SpeechMetrics,
   ): DeepSeekEvaluationResult {
-    this.logger.log('⚠️ Using fallback evaluation');
+    const cleaned = transcript.replace(/\s+/g, ' ').trim();
+    const wordCount = cleaned ? cleaned.split(/\s+/).length : 0;
+    const sentences = cleaned
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 8);
 
-    const wordCount = transcript.split(' ').length;
-    const sentences = transcript
-      .split(/[.!?]+/)
-      .filter((s) => s.trim().length > 0);
+    const keyPoints = this.transcriptKeyPoints(cleaned, sentences, 5);
+    const summary = this.transcriptSummary(cleaned, subject, sentences);
+    const { strengths, improvements } = this.metricsTiedFeedback(
+      speechMetrics,
+      cleaned,
+      wordCount,
+      sentences.length,
+    );
 
-    // Intelligent fallback scoring
+    const structureScore = Math.min(90, 48 + sentences.length * 7);
+    const vocabScore = Math.min(88, 55 + wordCount * 0.35);
+    const grammarScore = Math.min(82, 62 + (sentences.length > 3 ? 8 : 0));
     const hasRelevantTerms = subject
       .toLowerCase()
       .split(/\s+/)
       .some(
-        (term) => term.length > 3 && transcript.toLowerCase().includes(term),
+        (term) =>
+          term.length > 2 && cleaned.toLowerCase().includes(term.toLowerCase()),
       );
+    const topicRelevance = hasRelevantTerms ? 78 : 62;
 
-    // Check for introduction elements
-    const transcriptLower = transcript.toLowerCase();
-    const hasName = /name is|call me|i am [a-z]+/.test(transcriptLower);
-    const hasOrigin = /from|country|live in|come from/.test(transcriptLower);
-    const hasEducation =
-      /bachelor|degree|study|student|university|college/.test(transcriptLower);
-    const hasHobbies =
-      /hobby|like|love|enjoy|playing|watching|listening|reading/.test(
-        transcriptLower,
-      );
-    const hasFamily = /father|mother|brother|sister|parent|family/.test(
-      transcriptLower,
-    );
-
-    const elementCount = [
-      hasName,
-      hasOrigin,
-      hasEducation,
-      hasHobbies,
-      hasFamily,
-    ].filter(Boolean).length;
-
-    // Determine if this is a self-introduction
-    const isSelfIntroduction =
-      subject.toLowerCase().includes('introduce') ||
-      subject.toLowerCase().includes('about yourself');
-
-    let relevanceScore: number;
-    if (isSelfIntroduction) {
-      // Generous scoring for self-introductions
-      if (elementCount >= 4) relevanceScore = 88;
-      else if (elementCount >= 3) relevanceScore = 80;
-      else if (elementCount >= 2) relevanceScore = 72;
-      else relevanceScore = 65;
-    } else {
-      relevanceScore = hasRelevantTerms ? 75 : 60;
-    }
-
-    const structureScore = Math.min(90, 50 + sentences.length * 8);
-    const vocabScore = Math.min(88, 60 + wordCount * 0.3);
-    const grammarScore = Math.min(80, 65 + (sentences.length > 3 ? 10 : 0));
+    const gaps = this.suggestContentGaps(subject, keyPoints);
 
     return {
       scores: {
         contentStructure: Math.round(structureScore),
-        coherence: Math.min(85, 60 + sentences.length * 4),
-        topicRelevance: Math.round(relevanceScore),
+        coherence: Math.min(85, 58 + sentences.length * 3),
+        topicRelevance,
         grammar: Math.round(grammarScore),
         vocabulary: Math.round(vocabScore),
       },
       analysis: {
-        summary:
-          transcript.substring(0, 100) + (transcript.length > 100 ? '...' : ''),
-        keyPoints: [subject, 'Personal information', 'Interests and family'],
-        strengths: [
-          'Good effort to address the topic',
-          elementCount > 2
-            ? 'Covers multiple aspects of the topic'
-            : 'Provides basic information',
-          'Clear and understandable speech',
-        ],
-        improvements: [
-          'Add more specific details to enrich your response',
-          'Use more varied vocabulary',
-          'Practice structuring your response with clear paragraphs',
-        ],
-        cefrLevel: wordCount > 50 ? 'B1' : 'A2',
+        summary,
+        keyPoints,
+        strengths,
+        improvements,
+        cefrLevel: 'B1',
       },
       detailedFeedback: {
-        structure:
-          sentences.length > 3
-            ? 'Good organization with multiple sentences'
-            : 'Try to organize your thoughts more clearly',
-        contentGaps: [
-          'Could include more specific examples relevant to the topic',
-        ],
-        vocabularySuggestions: [
-          'Try using more descriptive words',
-          'Use synonyms to avoid repetition',
-        ],
+        structure: `The response unfolds over ${sentences.length} spoken segment(s) with roughly ${wordCount} words. ${sentences.length >= 3 ? 'There is some progression of ideas across sentences.' : 'Ideas are mostly carried in fewer, longer stretches — cohesion could be strengthened with clearer transitions.'}`,
+        contentGaps: gaps,
+        vocabularySuggestions: this.vocabFromTranscript(cleaned),
       },
     };
+  }
+
+  private transcriptKeyPoints(
+    cleaned: string,
+    sentences: string[],
+    max: number,
+  ): string[] {
+    const clip = (s: string) =>
+      s.length > 140 ? `${s.slice(0, 137).trim()}...` : s;
+    if (sentences.length >= 3) {
+      return sentences.slice(0, max).map(clip);
+    }
+    const parts = cleaned
+      .split(/\s+(?:and|but|so|because|which|that)\s+/i)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 25);
+    if (parts.length >= 2) {
+      return parts.slice(0, max).map(clip);
+    }
+    const chunks: string[] = [];
+    let rest = cleaned;
+    while (rest.length > 30 && chunks.length < max) {
+      const take = rest.slice(0, 120).trim();
+      const lastSpace = take.lastIndexOf(' ');
+      const piece =
+        lastSpace > 40 ? take.slice(0, lastSpace) : take;
+      chunks.push(piece.length > 140 ? `${piece.slice(0, 137)}...` : piece);
+      rest = rest.slice(piece.length).trim();
+    }
+    return chunks.length > 0 ? chunks : [clip(cleaned)];
+  }
+
+  private transcriptSummary(
+    cleaned: string,
+    subject: string,
+    sentences: string[],
+  ): string {
+    const topic = subject?.trim() || 'the assigned task';
+    if (sentences.length >= 2) {
+      const a = sentences[0];
+      const b = sentences[1];
+      return `On "${topic}", the learner states: ${a} They add: ${b}${sentences.length > 2 ? ' Further details follow in the rest of the recording.' : ''}`;
+    }
+    if (sentences.length === 1) {
+      return `On "${topic}", the learner concentrates mainly on one stretch of speech: ${sentences[0]}`;
+    }
+    const excerpt =
+      cleaned.length > 320 ? `${cleaned.slice(0, 317)}...` : cleaned;
+    return `On "${topic}", the spoken response (continuous text) covers the following content: ${excerpt}`;
+  }
+
+  private metricsTiedFeedback(
+    m: SpeechMetrics | undefined,
+    cleaned: string,
+    wordCount: number,
+    sentenceCount: number,
+  ): { strengths: string[]; improvements: string[] } {
+    const strengths: string[] = [];
+    const improvements: string[] = [];
+
+    if (m) {
+      if (m.fluency >= 72) {
+        strengths.push(
+          `Fluency score (${m.fluency}/100) suggests relatively smooth delivery for this response length.`,
+        );
+      } else if (m.fluency < 55) {
+        improvements.push(
+          `Fluency score (${m.fluency}/100) is low — practice connected speech and reduce hesitation on the ideas in this transcript.`,
+        );
+      }
+      if (m.pronunciation >= 72) {
+        strengths.push(
+          `Pronunciation score (${m.pronunciation}/100) indicates the speech was generally intelligible.`,
+        );
+      } else if (m.pronunciation < 55) {
+        improvements.push(
+          `Pronunciation score (${m.pronunciation}/100) suggests focusing on clarity for key terms used in the response.`,
+        );
+      }
+      const fillers = m.details?.fillerWords ?? 0;
+      const wpm = m.details?.wordsPerMinute ?? 0;
+      if (wpm > 0) {
+        strengths.push(
+          `Speaking rate is about ${wpm} words per minute (automatic estimate).`,
+        );
+      }
+      if (fillers > 5) {
+        improvements.push(
+          `Frequent filler words (${fillers} counted) — rehearse the main ideas in this transcript to reduce pauses.`,
+        );
+      }
+      const pause = m.details?.averagePauseDuration ?? 0;
+      if (pause > 1.2) {
+        improvements.push(
+          `Average pause length (~${pause.toFixed(1)}s) is high; shorter planning pauses would tighten delivery.`,
+        );
+      }
+    }
+
+    if (wordCount >= 55) {
+      strengths.push(
+        `Substantive length (~${wordCount} words) gives enough material to assess ideas beyond a minimal answer.`,
+      );
+    } else {
+      improvements.push(
+        `Response is fairly short (~${wordCount} words) — expanding with examples would better satisfy the task.`,
+      );
+    }
+    if (sentenceCount >= 4) {
+      strengths.push(
+        `Multiple sentences (${sentenceCount}) show an attempt to build the answer in steps.`,
+      );
+    } else {
+      improvements.push(
+        `Only ${sentenceCount} clear sentence-like unit(s) detected — break ideas into more explicit sentences for clarity.`,
+      );
+    }
+
+    const uniq = new Set(cleaned.toLowerCase().split(/\s+/));
+    if (uniq.size / Math.max(wordCount, 1) < 0.45 && wordCount > 25) {
+      improvements.push(
+        'Noticeable word repetition in the transcript — vary nouns and verbs when revising.',
+      );
+    }
+
+    if (strengths.length < 4) {
+      strengths.push(
+        `Excerpt from the learner's wording: "${cleaned.slice(0, Math.min(100, cleaned.length))}${cleaned.length > 100 ? '...' : ''}"`,
+      );
+    }
+    if (strengths.length < 4) {
+      strengths.push(
+        'The answer presents a continuous attempt to address the prompt rather than stopping after a single phrase.',
+      );
+    }
+    if (improvements.length < 4) {
+      improvements.push(
+        'Take the longest sentence in the recording, write it on paper, and correct grammar before re-recording.',
+      );
+    }
+    if (improvements.length < 4) {
+      improvements.push(
+        'Add one concrete example or number that supports the main claim you make in the transcript.',
+      );
+    }
+    if (improvements.length < 4) {
+      improvements.push(
+        'Outline three bullets before recording so each idea gets its own clear sentence.',
+      );
+    }
+
+    return {
+      strengths: strengths.slice(0, 6),
+      improvements: improvements.slice(0, 6),
+    };
+  }
+
+  private suggestContentGaps(
+    subject: string,
+    keyPoints: string[],
+  ): string[] {
+    const gaps: string[] = [];
+    const subj = subject.toLowerCase();
+    const blob = keyPoints.join(' ').toLowerCase();
+
+    if (/introduce|yourself|about you/.test(subj)) {
+      if (!/study|university|college|work|job|degree/i.test(blob)) {
+        gaps.push(
+          'A stronger self-introduction often adds study or work context.',
+        );
+      }
+      if (!/hobby|like|enjoy|free time/i.test(blob)) {
+        gaps.push('Could add interests or how they spend free time.');
+      }
+    } else {
+      gaps.push(
+        `Compare the response explicitly to all parts of the prompt: "${subject}".`,
+      );
+    }
+    gaps.push(
+      'Add one concrete example or scenario that illustrates the main claim.',
+    );
+    return gaps.slice(0, 5);
+  }
+
+  private vocabFromTranscript(cleaned: string): string[] {
+    const words = cleaned
+      .toLowerCase()
+      .replace(/[^a-z\s']/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 4);
+    const freq = new Map<string, number>();
+    for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
+    const repeated = [...freq.entries()]
+      .filter(([, n]) => n >= 3)
+      .map(([w]) => w);
+    const out: string[] = [];
+    for (const w of repeated.slice(0, 3)) {
+      out.push(
+        `The learner repeats "${w}" often — introduce synonyms or more specific terms next time.`,
+      );
+    }
+    if (out.length === 0) {
+      out.push(
+        'Pick two important nouns from your answer and prepare richer alternatives before recording again.',
+      );
+    }
+    return out.slice(0, 5);
   }
 }

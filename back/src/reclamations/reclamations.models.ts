@@ -40,6 +40,10 @@ export class Reclamation {
   @Column({ nullable: true })
   handledById?: string; // Admin/Instructor handling the reclamation
 
+  /** When a student files a reclamation, copy is visible to this instructor (their latest oral-performance instructor). */
+  @Column({ nullable: true })
+  targetInstructorId?: string;
+
   @Column({ nullable: true })
   responseMessage?: string;
 

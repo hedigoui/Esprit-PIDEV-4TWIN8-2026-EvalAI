@@ -1,10 +1,24 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Mail, User, GraduationCap, Mic, Github } from 'lucide-react';
+import ChangePasswordModal from './ChangePasswordModal';
 import styles from './Login.module.css';
+import { API_BASE_URL } from '../config/api';
+
+const OAUTH_ERROR_MESSAGES = {
+  oauth_not_configured:
+    'Social sign-in is not configured on the server. Add GOOGLE_CLIENT_ID / GITHUB_CLIENT_ID (and secrets) to the API .env file, or sign in with email and password.',
+  oauth_failed: 'Google or GitHub sign-in failed. Check API credentials and callback URLs in Google Cloud / GitHub OAuth app settings, or use email and password.',
+  oauth_missing: 'Sign-in was interrupted. Please try again.',
+  oauth_invalid: 'We could not read your account from the provider. Please try again.',
+  oauth_role: 'Your account role is not supported. Contact support.',
+  oauth_email: 'No email was returned from the provider. For GitHub, add a public email or allow email scope.',
+  deactivated: 'Your account is deactivated. Contact support.',
+};
 
 const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -12,6 +26,22 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [loggedInUser, setLoggedInUser] = useState(null);
+  const [loggedInToken, setLoggedInToken] = useState(null);
+
+  useEffect(() => {
+    const err = searchParams.get('error');
+    if (!err) return;
+    let msg = OAUTH_ERROR_MESSAGES[err] || OAUTH_ERROR_MESSAGES.oauth_failed;
+    if (err === 'oauth_not_configured') {
+      const p = searchParams.get('provider');
+      if (p === 'google') msg += ' Google OAuth variables are missing in back/.env.';
+      else if (p === 'github') msg += ' GitHub OAuth variables are missing in back/.env.';
+    }
+    setError(msg);
+    navigate('/', { replace: true });
+  }, [searchParams, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,7 +49,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/users/signin', {
+      const response = await fetch(`${API_BASE_URL}/users/signin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -49,6 +79,7 @@ const Login = () => {
         }
 
         const userRole = data.user?.role;
+        const isTemporaryPassword = data.user?.isTemporaryPassword;
         
         if (!userRole) {
           setError('No role found in user data');
@@ -56,6 +87,17 @@ const Login = () => {
           return;
         }
 
+        // If user has temporary password, show modal
+        if (isTemporaryPassword) {
+          setLoggedInUser(data.user);
+          setLoggedInToken(data.access_token);
+          setShowPasswordModal(true);
+          setLoading(false);
+          return;
+        }
+
+        // Otherwise proceed to dashboard
+        setIsTransitioning(true);
         setTimeout(() => {
           if (userRole === 'admin') {
             navigate('/admin/dashboard');
@@ -95,6 +137,16 @@ const Login = () => {
     setTimeout(() => {
       navigate('/signup');
     }, 300); // Match this with CSS transition duration
+  };
+
+  const navigateToDashboard = (userRole) => {
+    if (userRole === 'admin') {
+      navigate('/admin/dashboard');
+    } else if (userRole === 'instructor') {
+      navigate('/teacher/dashboard');
+    } else if (userRole === 'student') {
+      navigate('/student/dashboard');
+    }
   };
 
   return (
@@ -253,7 +305,9 @@ const Login = () => {
               <button 
                 type="button" 
                 className={styles.socialButton}
-                onClick={() => window.open('http://localhost:3000/auth/github', '_self')}
+                onClick={() => {
+                  window.location.assign(`${API_BASE_URL}/auth/github`);
+                }}
                 disabled={loading}
               >
                 <Github size={20} />
@@ -262,7 +316,9 @@ const Login = () => {
               <button 
                 type="button" 
                 className={`${styles.socialButton} ${styles.googleButton}`}
-                onClick={() => window.open('http://localhost:3000/auth/google', '_self')}
+                onClick={() => {
+                  window.location.assign(`${API_BASE_URL}/auth/google`);
+                }}
                 disabled={loading}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24">
@@ -285,6 +341,23 @@ const Login = () => {
           EvalAI © 2026
         </footer>
       </div>
+
+      {showPasswordModal && loggedInUser && loggedInToken && (
+        <ChangePasswordModal
+          user={loggedInUser}
+          token={loggedInToken}
+          onClose={() => {
+            setShowPasswordModal(false);
+            navigateToDashboard(loggedInUser.role);
+          }}
+          onSuccess={() => {
+            setShowPasswordModal(false);
+            setTimeout(() => {
+              navigateToDashboard(loggedInUser.role);
+            }, 500);
+          }}
+        />
+      )}
     </div>
   );
 };

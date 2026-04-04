@@ -161,3 +161,16 @@
     grid-template-columns: 1fr;
   }
 }
+
+:global([data-theme='dark']) .toggleItem {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+:global([data-theme='dark']) .input:focus {
+  background: var(--bg-card-solid);
+}
+
+:global([data-theme='dark']) .select option {
+  background: var(--bg-card-solid);
+  color: var(--text-primary);
+}

@@ -1,64 +1,111 @@
 // src/pages/student/Practice.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import StudentSidebar from '../../components/StudentSidebar';
-import { Upload, Bot, Mic, MicOff, CheckCircle, XCircle, Loader, Play, Pause, Award, User } from 'lucide-react';
+import AiDisclosureNotice from '../../components/AiDisclosureNotice';
+import {
+  Upload,
+  Bot,
+  Mic,
+  MicOff,
+  CheckCircle,
+  XCircle,
+  Loader,
+  Send,
+  RotateCcw,
+  BarChart3,
+} from 'lucide-react';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import { useEvaluation } from '../../hooks/useEvaluation';
 import { oralPerformanceService } from '../services/oralPerformance.service';
+import type { EvaluationResult } from '../services/oralPerformance.service';
+import {
+  deriveCefrLevel,
+  holisticOralIndex,
+  indexToCefr,
+} from '../../utils/cefrCalibration';
 
-// Import CSS modules
+// @ts-ignore
 import styles from '../../styles/shared.module.css';
-import practiceStyles from './Practice.module.css';
+// @ts-ignore — same layout & AI panels as teacher Evaluate
+import evaluateStyles from '../teacher/Evaluate.module.css';
 
-// Define types
-interface Scores {
-  fluency: number;
-  pronunciation: number;
-  speakingPace: number;
-  confidence: number;
-  contentStructure: number;
+interface Performance {
+  _id: string;
+  studentId?: string;
+  title?: string;
+  description?: string;
+  audioFile?: {
+    fileId: string;
+    filename: string;
+    size: number;
+    duration?: number;
+    mimeType: string;
+    uploadedAt: string;
+  };
+  status?: string;
+  createdAt?: string;
+  totalScore?: number;
+  feedback?: { generalComments?: string; cefrLevel?: string };
+  scores?: Record<string, number | undefined>;
 }
 
-// Get student ID from token
+interface HistoryRow {
+  performance: Performance & { _id?: string; id?: string };
+  evaluation?: EvaluationResult | null;
+}
+
+function perfId(p: Performance | HistoryRow['performance'] | null | undefined): string {
+  if (!p) return '';
+  const x = p as { _id?: string; id?: string };
+  return (x._id || x.id || '') as string;
+}
+
+function getAudioDurationSeconds(blob: Blob): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const audio = document.createElement('audio');
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      const d = audio.duration;
+      resolve(Number.isFinite(d) && d > 0 ? Math.round(d) : 60);
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(60);
+    };
+    audio.src = url;
+  });
+}
+
 const getStudentIdFromToken = (): string => {
   const token = localStorage.getItem('token');
   if (!token) return '';
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     return payload.sub || '';
-  } catch (error) {
-    console.error('Failed to decode token:', error);
+  } catch {
     return '';
   }
 };
 
 const Practice: React.FC = () => {
+  const navigate = useNavigate();
   const studentId = getStudentIdFromToken();
-  const hasCreatedRef = useRef(false);
-  
-  const [recordMode, setRecordMode] = useState<'upload' | 'record'>('record');
-  const [performance, setPerformance] = useState<any | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
-  
-  // Evaluation states
-  const [subject, setSubject] = useState<string>('');
-  const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
-  const [showEvaluationForm, setShowEvaluationForm] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'record' | 'upload'>('record');
 
-  // Scores state
-  const [scores, setScores] = useState<Scores>({
-    fluency: 8,
-    pronunciation: 8,
-    speakingPace: 7,
-    confidence: 7,
-    contentStructure: 8,
-  });
-  
-  const [cefrLevel, setCefrLevel] = useState<string>('B2');
-  const [finalCEFR, setFinalCEFR] = useState<{ level: string; score: number }>({ level: 'A1', score: 0 });
+  const [recordMode, setRecordMode] = useState<'upload' | 'record'>('record');
+  const [performance, setPerformance] = useState<Performance | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [subject, setSubject] = useState('');
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [showEvaluationForm, setShowEvaluationForm] = useState(false);
+  const [recordingPrepared, setRecordingPrepared] = useState(false);
+  const [submissionHistory, setSubmissionHistory] = useState<HistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedHistoryId, setSelectedHistoryId] = useState('');
 
   const {
     isRecording,
@@ -66,326 +113,257 @@ const Practice: React.FC = () => {
     audioUrl,
     error: recordingError,
     formattedTime,
+    recordingTime,
     startRecording,
     stopRecording,
     resetRecording,
+    loadExternalAudio,
   } = useAudioRecorder();
 
-  // Use evaluation hook
   const {
     evaluation,
     isLoading: evaluationLoading,
     error: evaluationError,
     startEvaluation,
     fetchEvaluation,
+    stopPolling,
   } = useEvaluation({
     performanceId: performance?._id || '',
     autoPoll: true,
   });
 
-  // Calculate weighted overall score
+  const loadSubmissionHistory = useCallback(async () => {
+    if (!studentId) return;
+    try {
+      setHistoryLoading(true);
+      const list = await oralPerformanceService.getAllStudentEvaluations(studentId);
+      const rows = Array.isArray(list) ? list : [];
+      rows.sort(
+        (a, b) =>
+          new Date(b.performance?.createdAt || 0).getTime() -
+          new Date(a.performance?.createdAt || 0).getTime(),
+      );
+      setSubmissionHistory(rows as HistoryRow[]);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [studentId]);
+
+  useEffect(() => {
+    if (!studentId) {
+      navigate('/', { replace: true });
+      return;
+    }
+    loadSubmissionHistory();
+  }, [studentId, navigate, loadSubmissionHistory]);
+
+  useEffect(() => {
+    if (performance?._id) {
+      const t = setTimeout(() => fetchEvaluation(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [performance?._id, fetchEvaluation]);
+
   const calculateWeightedScore = () => {
-    if (!evaluation?.speechMetrics) return 90;
-    
-    // Speech metrics (50% of total)
-    const speechScore = (
-      (evaluation.speechMetrics.fluency || 0) * 0.15 +      // 15%
-      (evaluation.speechMetrics.pronunciation || 0) * 0.15 + // 15%
-      Math.min(100, (evaluation.speechMetrics.speakingPace || 0) / 1.8) * 0.1 + // 10% (normalized to 100)
-      (evaluation.speechMetrics.confidence || 0) * 0.1       // 10%
-    );
-    
-    // Content metrics (50% of total)
-    const contentScore = (
+    if (!evaluation?.speechMetrics) return 0;
+    const speechScore =
+      (evaluation.speechMetrics.fluency || 0) * 0.15 +
+      (evaluation.speechMetrics.pronunciation || 0) * 0.15 +
+      Math.min(100, (evaluation.speechMetrics.speakingPace || 0) / 1.8) * 0.1 +
+      (evaluation.speechMetrics.confidence || 0) * 0.1;
+    const contentScore =
       (evaluation.contentScores?.contentStructure || 0) * 0.1 +
       (evaluation.contentScores?.coherence || 0) * 0.1 +
       (evaluation.contentScores?.topicRelevance || 0) * 0.1 +
       (evaluation.contentScores?.grammar || 0) * 0.1 +
-      (evaluation.contentScores?.vocabulary || 0) * 0.1
-    );
-    
+      (evaluation.contentScores?.vocabulary || 0) * 0.1;
     return Math.round(speechScore + contentScore);
   };
 
-  // Map score to CEFR level
-  const getCEFRFromScore = (score: number): string => {
-    if (score >= 85) return 'C1';
-    if (score >= 75) return 'B2';
-    if (score >= 65) return 'B1';
-    if (score >= 55) return 'A2';
-    return 'A1';
-  };
-
-  // Calculate final unified CEFR level based on ALL criteria
-  const calculateFinalCEFRLevel = (
-    speechMetrics: any,
-    contentScores: any,
-    geminiLevel?: string
-  ): { level: string; score: number } => {
-    
-    // 1. Calculate Speech Score (50% of final)
-    const speechScore = (
-      (speechMetrics?.fluency || 0) * 0.15 +      // 15%
-      (speechMetrics?.pronunciation || 0) * 0.15 + // 15%
-      Math.min(100, (speechMetrics?.speakingPace || 0) / 1.8) * 0.1 + // 10%
-      (speechMetrics?.confidence || 0) * 0.1       // 10%
-    );
-    
-    // 2. Calculate Content Score (50% of final)
-    const contentScore = (
-      (contentScores?.contentStructure || 0) * 0.1 +
-      (contentScores?.coherence || 0) * 0.1 +
-      (contentScores?.topicRelevance || 0) * 0.1 +
-      (contentScores?.grammar || 0) * 0.1 +
-      (contentScores?.vocabulary || 0) * 0.1
-    );
-    
-    // 3. Base combined score
-    let combinedScore = speechScore + contentScore;
-    
-    // 4. Adjust based on Gemini level (if available)
-    if (geminiLevel) {
-      const geminiScore = {
-        'A1': 50,
-        'A2': 60,
-        'B1': 70,
-        'B2': 80,
-        'C1': 90,
-        'C2': 100
-      }[geminiLevel] || 60;
-      
-      // Weighted: 70% combined metrics, 30% Gemini assessment
-      combinedScore = (combinedScore * 0.7) + (geminiScore * 0.3);
-    }
-    
-    // 5. Ensure score is within 0-100
-    const finalScore = Math.min(100, Math.max(0, Math.round(combinedScore)));
-    
-    // 6. Convert to CEFR level
-    let finalLevel: string;
-    if (finalScore >= 85) finalLevel = 'C1';
-    else if (finalScore >= 75) finalLevel = 'B2';
-    else if (finalScore >= 70) finalLevel = 'B1+';
-    else if (finalScore >= 65) finalLevel = 'B1';
-    else if (finalScore >= 60) finalLevel = 'A2+';
-    else if (finalScore >= 55) finalLevel = 'A2';
-    else finalLevel = 'A1';
-    
-    return { level: finalLevel, score: finalScore };
-  };
-
   const overallScore = calculateWeightedScore();
-  
-  // Use Gemini CEFR if available, otherwise calculate from score
-  const displayedCEFRLevel = evaluation?.contentAnalysis?.cefrLevel || getCEFRFromScore(overallScore);
 
-  // Update final CEFR when evaluation changes
-  useEffect(() => {
-    if (evaluation?.speechMetrics) {
-      const final = calculateFinalCEFRLevel(
-        evaluation.speechMetrics,
-        evaluation.contentScores,
-        evaluation.contentAnalysis?.cefrLevel
-      );
-      setFinalCEFR(final);
-    }
+  const displayedCEFR =
+    evaluation?.contentAnalysis?.cefrLevel ||
+    (evaluation?.contentScores
+      ? deriveCefrLevel(
+          evaluation.contentScores,
+          evaluation.speechMetrics ?? null,
+        )
+      : indexToCefr(Math.min(100, Math.max(0, overallScore))));
+
+  const holisticScore = useMemo(() => {
+    if (!evaluation?.contentScores) return 0;
+    return holisticOralIndex(
+      evaluation.contentScores,
+      evaluation.speechMetrics ?? null,
+    );
   }, [evaluation]);
 
-  // Update scores when evaluation results come in
-  useEffect(() => {
-    if (evaluation?.speechMetrics) {
-      setScores({
-        fluency: Math.round(evaluation.speechMetrics.fluency / 10),
-        pronunciation: Math.round(evaluation.speechMetrics.pronunciation / 10),
-        speakingPace: Math.min(10, Math.round(evaluation.speechMetrics.speakingPace / 15)),
-        confidence: Math.round(evaluation.speechMetrics.confidence / 10),
-        contentStructure: evaluation.contentScores?.contentStructure 
-          ? Math.round(evaluation.contentScores.contentStructure / 10)
-          : scores.contentStructure,
-      });
+  const selectedRow = useMemo(
+    () =>
+      submissionHistory.find((r) => perfId(r.performance) === selectedHistoryId) ||
+      null,
+    [submissionHistory, selectedHistoryId],
+  );
 
-      setShowEvaluationForm(true);
-    }
-  }, [evaluation]);
-
-  // Create a practice performance when component mounts (only once)
-  useEffect(() => {
-    if (studentId && !performance && !hasCreatedRef.current) {
-      hasCreatedRef.current = true;
-      handleCreatePractice();
-    }
-  }, [studentId, performance]);
-
-  // Fetch evaluation only when performance exists
-  useEffect(() => {
-    if (performance?._id) {
-      const timer = setTimeout(() => {
-        fetchEvaluation();
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [performance?._id]);
-
-  const handleCreatePractice = async (): Promise<void> => {
-    if (!studentId) {
-      setUploadError('Please log in to practice');
-      return;
-    }
-
+  const handleHistorySelection = async (historyId: string): Promise<void> => {
+    setSelectedHistoryId(historyId);
+    if (!historyId) return;
+    const row = submissionHistory.find((r) => perfId(r.performance) === historyId);
+    if (!row) return;
     try {
-      setIsLoading(true);
-      setUploadError(null);
-      
-      console.log('Creating practice for student:', studentId);
-      
-      const newPerformance = await oralPerformanceService.create({
-        studentId: studentId,
-        title: `Practice Session - ${new Date().toLocaleDateString()}`,
-        description: 'Self-practice session',
-      });
-      
-      console.log('Practice created:', newPerformance);
-      setPerformance(newPerformance);
-      
-    } catch (error) {
-      setUploadError('Failed to create practice session');
-      console.error('Create practice error:', error);
-    } finally {
-      setIsLoading(false);
+      const full = await oralPerformanceService.getPerformance(historyId);
+      setPerformance(full as Performance);
+      setSubject((full as Performance).title || '');
+      setRecordingPrepared(false);
+      resetRecording();
+      setShowEvaluationForm(Boolean((full as Performance).audioFile));
+    } catch (e) {
+      console.error(e);
+      setPerformance(row.performance as Performance);
+      setSubject(row.performance.title || '');
+      setShowEvaluationForm(Boolean(row.performance.audioFile));
     }
   };
 
-  const handleUploadRecording = async (): Promise<void> => {
-    if (!audioBlob) {
-      console.log('No audio blob to upload');
-      return;
-    }
+  const handleNewPractice = (): void => {
+    stopPolling();
+    resetRecording();
+    setPerformance(null);
+    setSubject('');
+    setSelectedHistoryId('');
+    setRecordingPrepared(false);
+    setShowEvaluationForm(false);
+    setUploadError(null);
+    setUploadSuccess(false);
+    setIsEvaluating(false);
+  };
 
-    if (!subject.trim()) {
-      alert('Please enter a topic/subject for your practice');
-      return;
-    }
+  const handleUploadRecording = (): void => {
+    if (!audioBlob) return;
+    setUploadError(null);
+    setRecordingPrepared(true);
+    setShowEvaluationForm(true);
+    setUploadSuccess(true);
+    setTimeout(() => setUploadSuccess(false), 3000);
+  };
 
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ): Promise<void> => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
     try {
-      setIsLoading(true);
       setUploadError(null);
-      setUploadSuccess(false);
-
-      console.log('Starting upload process...');
-      console.log('Audio blob size:', audioBlob.size);
-      console.log('Formatted time:', formattedTime);
-
-      let currentPerformance = performance;
-      
-      if (!currentPerformance) {
-        console.log('No performance exists, creating one first...');
-        
-        currentPerformance = await oralPerformanceService.create({
-          studentId: studentId,
-          title: `Practice Session - ${new Date().toLocaleDateString()}`,
-          description: subject,
-        });
-        
-        console.log('Practice created:', currentPerformance);
-        setPerformance(currentPerformance);
-      }
-
-      if (!currentPerformance) throw new Error('Failed to create practice session');
-
-      const timeParts = formattedTime.split(':');
-      const durationInSeconds = parseInt(timeParts[0]) * 60 + parseInt(timeParts[1]);
-        
-      console.log('Duration in seconds:', durationInSeconds);
-      console.log('Uploading to performance ID:', currentPerformance._id);
-
-      const updatedPerformance = await oralPerformanceService.uploadAudio(
-        currentPerformance._id,
-        audioBlob,
-        durationInSeconds
-      );
-
-      console.log('Upload successful:', updatedPerformance);
-      
-      if (!updatedPerformance.audioFile) {
-        console.error('Upload succeeded but audioFile is missing!');
-        setUploadError('Upload succeeded but audio file not found');
-        return;
-      }
-      
-      setPerformance(updatedPerformance);
-      setUploadSuccess(true);
-      
-      // Show evaluation form after successful upload
+      const blob = file.slice(0, file.size, file.type || 'audio/webm');
+      const dur = await getAudioDurationSeconds(blob);
+      loadExternalAudio(blob, dur);
+      setRecordingPrepared(true);
       setShowEvaluationForm(true);
-      
-      // Auto-start evaluation
-      setTimeout(() => {
-        handleStartEvaluation();
-      }, 1000);
-      
-      resetRecording();
-
-      setTimeout(() => setUploadSuccess(false), 3000);
-        
-    } catch (error) {
-      setUploadError('Failed to upload recording');
-      console.error('Upload error:', error);
-    } finally {
-      setIsLoading(false);
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 2500);
+    } catch (err) {
+      console.error(err);
+      setUploadError('Could not load audio file.');
     }
   };
 
   const handleStartEvaluation = async (): Promise<void> => {
-    if (!performance) {
-      alert('Please create a practice session first');
-      return;
-    }
-
-    try {
-      const refreshedPerformance = await oralPerformanceService.getPerformance(performance._id);
-      setPerformance(refreshedPerformance);
-      
-      if (!refreshedPerformance.audioFile) {
-        alert('Please record and save an audio file first');
-        return;
-      }
-    } catch (error) {
-      console.error('Failed to refresh performance:', error);
-      alert('Error checking audio file');
-      return;
-    }
-
     if (!subject.trim()) {
-      alert('Please enter a topic for your practice');
+      alert('Please enter a topic you practiced.');
       return;
     }
-
     try {
       setIsEvaluating(true);
-      await startEvaluation(subject);
+      setUploadError(null);
+      let currentPerformance = performance;
+
+      if (!currentPerformance?.audioFile) {
+        if (!audioBlob) {
+          alert('Please record or upload audio first.');
+          return;
+        }
+        const durationInSeconds = Math.max(
+          1,
+          recordingTime > 0
+            ? recordingTime
+            : (() => {
+                const parts = formattedTime.split(':');
+                return (
+                  parseInt(parts[0] || '0', 10) * 60 +
+                  parseInt(parts[1] || '0', 10)
+                );
+              })(),
+        );
+
+        const created = await oralPerformanceService.create({
+          studentId,
+          title: subject.trim(),
+          description: 'Practice session',
+        });
+        currentPerformance = (await oralPerformanceService.uploadAudio(
+          created._id,
+          audioBlob,
+          durationInSeconds,
+        )) as Performance;
+        setPerformance(currentPerformance);
+        setRecordingPrepared(false);
+      }
+
+      if (!currentPerformance?._id) {
+        setUploadError('Session is not ready. Try saving your recording again.');
+        return;
+      }
+
+      await startEvaluation(subject.trim(), currentPerformance._id);
+      const refreshed = await oralPerformanceService.getPerformance(
+        currentPerformance._id,
+      );
+      setPerformance(refreshed as Performance);
+      await loadSubmissionHistory();
+      setSelectedHistoryId(currentPerformance._id);
     } catch (error) {
-      console.error('Failed to start evaluation:', error);
+      console.error(error);
+      setUploadError(
+        error instanceof Error ? error.message : 'Failed to start AI feedback.',
+      );
     } finally {
       setIsEvaluating(false);
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const blob = new Blob([file], { type: file.type });
-      console.log('File selected:', file);
+  const showEvaluationError =
+    !!evaluationError &&
+    evaluationError !== 'Evaluation not found' &&
+    !/no performance id|performance id available/i.test(evaluationError);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return '#10b981';
+      case 'processing':
+        return '#f59e0b';
+      case 'failed':
+        return '#ef4444';
+      default:
+        return '#6b7280';
     }
   };
 
-  // Helper to get status color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return '#10b981';
-      case 'processing': return '#f59e0b';
-      case 'failed': return '#ef4444';
-      default: return '#6b7280';
-    }
+  const cardClass = styles?.card || 'card';
+  const cardTitleClass = styles?.cardTitle || 'card-title';
+  const primaryButtonClass = styles?.primaryButton || 'primary-button';
+  const secondaryButtonClass = styles?.secondaryButton || 'secondary-button';
+
+  const evalAny = evaluation as EvaluationResult & {
+    detailedContentFeedback?: {
+      structure?: string;
+      contentGaps?: string[];
+      vocabularySuggestions?: string[];
+    };
   };
 
   return (
@@ -395,417 +373,907 @@ const Practice: React.FC = () => {
         <main className={styles.content}>
           <div className={styles.pageHeader}>
             <div>
-              <h1 className={styles.pageTitle}>Practice Mode</h1>
-              <p className={styles.pageSubtitle}>Record yourself and get instant AI feedback</p>
+              <h1 className={styles.pageTitle}>Practice</h1>
+              <p className={styles.pageSubtitle}>
+                Self-study mode: record a response, run AI analysis, and review your submission
+                history—same feedback layout as in class evaluations.
+              </p>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className={secondaryButtonClass}
+                onClick={handleNewPractice}
+                title="Start a fresh session"
+              >
+                <RotateCcw size={18} />
+                New practice session
+              </button>
+              {(recordingPrepared || performance?.audioFile) && (
+                <button
+                  type="button"
+                  className={primaryButtonClass}
+                  onClick={handleStartEvaluation}
+                  disabled={isLoading || isEvaluating}
+                >
+                  <Send size={18} />
+                  {isLoading || isEvaluating ? 'Analyzing…' : 'Start AI feedback'}
+                </button>
+              )}
+              <button
+                type="button"
+                className={secondaryButtonClass}
+                onClick={() => navigate('/student/dashboard')}
+              >
+                <BarChart3 size={18} />
+                Progress on dashboard
+              </button>
             </div>
           </div>
 
-          {/* Status Messages */}
+          <AiDisclosureNotice />
+
           {uploadError && (
-            <div className={practiceStyles.errorMessage}>
+            <div
+              style={{
+                backgroundColor: '#fee2e2',
+                color: '#dc2626',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
               <XCircle size={18} />
               {uploadError}
             </div>
           )}
 
           {uploadSuccess && (
-            <div className={practiceStyles.successMessage}>
+            <div
+              style={{
+                backgroundColor: '#d1fae5',
+                color: '#059669',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
               <CheckCircle size={18} />
-              Recording uploaded successfully!
+              Recording ready. Add a topic and press Start AI feedback.
             </div>
           )}
 
-          {evaluationError && evaluationError !== 'Evaluation not found' && (
-            <div className={practiceStyles.errorMessage}>
+          {showEvaluationError && (
+            <div
+              style={{
+                backgroundColor: '#fee2e2',
+                color: '#dc2626',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
               <XCircle size={18} />
-              Evaluation error: {evaluationError}
+              {evaluationError}
             </div>
           )}
 
           {recordingError && (
-            <div className={practiceStyles.errorMessage}>
+            <div
+              style={{
+                backgroundColor: '#fee2e2',
+                color: '#dc2626',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+              }}
+            >
               {recordingError}
             </div>
           )}
 
-          {/* Evaluation Status Banner */}
-          {evaluation && evaluation.status !== 'pending' && (
-            <div className={practiceStyles.statusBanner} style={{ 
-              backgroundColor: `${getStatusColor(evaluation.status)}10`,
-              borderColor: getStatusColor(evaluation.status),
-              color: getStatusColor(evaluation.status)
-            }}>
+          {evaluation && (
+            <div
+              style={{
+                backgroundColor: `${getStatusColor(evaluation.status)}10`,
+                border: `1px solid ${getStatusColor(evaluation.status)}`,
+                color: getStatusColor(evaluation.status),
+                padding: '0.75rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {evaluation.status === 'processing' && <Loader size={16} className="spin" />}
+                {evaluation.status === 'processing' && (
+                  <Loader size={16} className="spin" />
+                )}
                 {evaluation.status === 'completed' && <CheckCircle size={16} />}
                 {evaluation.status === 'failed' && <XCircle size={16} />}
                 <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>
-                  {evaluation.status === 'completed' ? 'Feedback Ready!' : `Evaluation ${evaluation.status}...`}
+                  AI feedback: {evaluation.status}
                 </span>
               </div>
             </div>
           )}
 
-          {/* Subject Input */}
-          <div className={practiceStyles.subjectCard}>
-            <label>What would you like to practice?</label>
-            <input
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="e.g., Introduce yourself, Describe your hometown, Talk about your hobbies..."
-              disabled={isLoading || isEvaluating || evaluation?.status === 'completed'}
-            />
-          </div>
+          <div className={evaluateStyles.evaluateGrid}>
+            <div className={evaluateStyles.leftColumn}>
+              <div className={cardClass}>
+                <h3 className={cardTitleClass}>Session recording</h3>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setRecordMode('upload')}
+                    style={{
+                      flex: 1,
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      transition: 'all 0.2s',
+                      background: recordMode === 'upload' ? '#E31837' : 'rgba(0,0,0,0.04)',
+                      color: recordMode === 'upload' ? '#fff' : '#64748b',
+                    }}
+                  >
+                    <Upload size={16} /> Upload audio
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecordMode('record')}
+                    style={{
+                      flex: 1,
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      transition: 'all 0.2s',
+                      background: recordMode === 'record' ? '#E31837' : 'rgba(0,0,0,0.04)',
+                      color: recordMode === 'record' ? '#fff' : '#64748b',
+                    }}
+                  >
+                    <Mic size={16} /> Record
+                  </button>
+                </div>
 
-          {/* Tab Selection */}
-          <div className={practiceStyles.tabContainer}>
-            <button 
-              className={`${practiceStyles.tab} ${activeTab === 'record' ? practiceStyles.activeTab : ''}`}
-              onClick={() => setActiveTab('record')}
-              disabled={evaluation?.status === 'completed'}
-            >
-              <Mic size={18} />
-              Record Session
-            </button>
-            <button 
-              className={`${practiceStyles.tab} ${activeTab === 'upload' ? practiceStyles.activeTab : ''}`}
-              onClick={() => setActiveTab('upload')}
-              disabled={evaluation?.status === 'completed'}
-            >
-              <Upload size={18} />
-              Upload Audio
-            </button>
-          </div>
-
-          <div className={practiceStyles.practiceGrid}>
-            {/* Left: Recording Area */}
-            <div className={styles.card}>
-              <h3 className={styles.cardTitle}>Session Recording</h3>
-              
-              {activeTab === 'record' ? (
-                <div className={practiceStyles.recordingArea}>
-                  {audioUrl ? (
-                    <div className={practiceStyles.audioPreview}>
-                      <audio controls src={audioUrl} style={{ width: '100%', marginBottom: '1rem' }} />
-                      <div className={practiceStyles.audioActions}>
-                        <button
-                          className={styles.secondaryButton}
-                          onClick={resetRecording}
-                          disabled={isLoading || evaluation?.status === 'completed'}
-                        >
-                          Record Again
-                        </button>
-                        <button
-                          className={styles.primaryButton}
-                          onClick={handleUploadRecording}
-                          disabled={isLoading || isEvaluating || !subject.trim() || evaluation?.status === 'completed'}
-                        >
-                          {isLoading ? 'Uploading...' : isEvaluating ? 'Evaluating...' : 'Save Recording'}
-                        </button>
-                      </div>
+                {recordMode === 'upload' ? (
+                  <div className={evaluateStyles.videoContainer}>
+                    <div className={evaluateStyles.videoPlaceholder}>
+                      <Upload size={48} />
+                      <p>Upload a short audio clip to analyze</p>
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        style={{ display: 'none' }}
+                        id="practice-audio-upload"
+                        onChange={handleFileUpload}
+                      />
+                      <button
+                        type="button"
+                        className={secondaryButtonClass}
+                        onClick={() =>
+                          document.getElementById('practice-audio-upload')?.click()
+                        }
+                      >
+                        <Upload size={16} /> Choose file
+                      </button>
+                      {audioUrl && (
+                        <audio
+                          controls
+                          src={audioUrl}
+                          style={{ width: '100%', marginTop: '0.75rem' }}
+                        />
+                      )}
                     </div>
-                  ) : (
-                    <>
-                      <div className={practiceStyles.videoPreview}>
-                        <Mic size={48} style={{ color: isRecording ? '#E31837' : 'rgba(0,0,0,0.2)' }} />
-                        <p>
-                          {isRecording 
-                            ? 'Recording in progress...' 
-                            : performance?.audioFile 
-                              ? 'Recording already exists' 
-                              : 'Click Record to start practicing'
-                          }
-                        </p>
-                      </div>
-                      
-                      {!performance?.audioFile && (
-                        <>
-                          <div className={practiceStyles.recordingControls}>
-                            <button 
-                              className={isRecording ? styles.secondaryButton : styles.primaryButton}
-                              onClick={isRecording ? stopRecording : startRecording}
-                              disabled={isLoading || evaluation?.status === 'completed'}
-                              style={isRecording ? { borderColor: '#E31837', color: '#E31837' } : {}}
+                  </div>
+                ) : (
+                  <div className={evaluateStyles.videoContainer}>
+                    <div
+                      className={evaluateStyles.videoPlaceholder}
+                      style={{
+                        background: isRecording ? 'rgba(227,24,55,0.03)' : undefined,
+                      }}
+                    >
+                      {audioUrl ? (
+                        <div style={{ width: '100%' }}>
+                          <audio
+                            controls
+                            src={audioUrl}
+                            style={{ width: '100%', marginBottom: '1rem' }}
+                          />
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              type="button"
+                              className={secondaryButtonClass}
+                              onClick={resetRecording}
+                              style={{ flex: 1 }}
                             >
-                              {isRecording ? (
-                                <><MicOff size={16} /> Stop Recording</>
-                              ) : (
-                                <><Mic size={16} /> Start Recording</>
-                              )}
+                              Record again
+                            </button>
+                            <button
+                              type="button"
+                              className={primaryButtonClass}
+                              onClick={handleUploadRecording}
+                              disabled={isLoading}
+                              style={{ flex: 1 }}
+                            >
+                              {isLoading ? 'Saving…' : 'Save recording'}
                             </button>
                           </div>
-
-                          {isRecording && (
-                            <div className={practiceStyles.recordingTimer}>
-                              <span className={practiceStyles.recordingIndicator} />
-                              REC {formattedTime}
+                        </div>
+                      ) : (
+                        <>
+                          <Mic
+                            size={48}
+                            style={{ color: isRecording ? '#E31837' : 'rgba(0,0,0,0.2)' }}
+                          />
+                          <p>
+                            {isRecording
+                              ? 'Recording…'
+                              : performance?.audioFile
+                                ? 'Recording saved for this session'
+                                : 'Press record, speak, then stop and save'}
+                          </p>
+                          {!performance?.audioFile && (
+                            <>
+                              <button
+                                type="button"
+                                className={
+                                  isRecording ? secondaryButtonClass : primaryButtonClass
+                                }
+                                onClick={isRecording ? stopRecording : startRecording}
+                                disabled={isLoading}
+                                style={
+                                  isRecording
+                                    ? { borderColor: '#E31837', color: '#E31837' }
+                                    : {}
+                                }
+                              >
+                                {isRecording ? (
+                                  <>
+                                    <MicOff size={16} /> Stop
+                                  </>
+                                ) : (
+                                  <>
+                                    <Mic size={16} /> Start recording
+                                  </>
+                                )}
+                              </button>
+                              {isRecording && (
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    marginTop: '0.5rem',
+                                    color: '#E31837',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: '50%',
+                                      background: '#E31837',
+                                      animation: 'pulse 1.5s infinite',
+                                    }}
+                                  />
+                                  REC {formattedTime}
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {performance?.audioFile && (
+                            <div
+                              style={{
+                                marginTop: '1rem',
+                                padding: '1rem',
+                                background: '#d1fae5',
+                                borderRadius: '8px',
+                                color: '#059669',
+                                width: '100%',
+                              }}
+                            >
+                              <CheckCircle size={24} />
+                              <p style={{ margin: '0.35rem 0' }}>Recording saved</p>
+                              <audio
+                                controls
+                                src={oralPerformanceService.getAudioUrl(performance._id)}
+                                style={{ width: '100%', marginTop: '0.5rem' }}
+                              />
+                            </div>
+                          )}
+                          {recordingPrepared && !performance?.audioFile && (
+                            <div
+                              style={{
+                                marginTop: '1rem',
+                                padding: '1rem',
+                                background: '#dbeafe',
+                                borderRadius: '8px',
+                                color: '#1d4ed8',
+                                width: '100%',
+                              }}
+                            >
+                              <CheckCircle size={24} />
+                              <p style={{ margin: 0 }}>
+                                Ready to send—enter your topic and start AI feedback.
+                              </p>
                             </div>
                           )}
                         </>
                       )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-                      {performance?.audioFile && (
-                        <div className={practiceStyles.existingRecording}>
-                          <CheckCircle size={24} />
-                          <p>Recording saved</p>
-                          <audio 
-                            controls 
-                            src={oralPerformanceService.getAudioUrl(performance._id)}
-                            style={{ width: '100%', marginTop: '0.5rem' }}
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className={practiceStyles.uploadArea}>
-                  <Upload size={48} />
-                  <p>Upload an audio file to practice</p>
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    style={{ display: 'none' }}
-                    id="audio-upload"
-                    onChange={handleFileUpload}
-                  />
-                  <button 
-                    className={styles.secondaryButton}
-                    onClick={() => document.getElementById('audio-upload')?.click()}
+              {showEvaluationForm && (recordingPrepared || performance?.audioFile) && (
+                <div className={cardClass}>
+                  <div className={evaluateStyles.sectionHeader}>
+                    <Bot size={20} />
+                    <h3>AI-supported feedback</h3>
+                  </div>
+                  <div
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      background: 'rgba(59,130,246,0.06)',
+                      borderRadius: '8px',
+                      margin: '0 0 1rem',
+                      fontSize: '0.72rem',
+                      color: '#3b82f6',
+                      lineHeight: 1.45,
+                    }}
                   >
-                    <Upload size={16} />
-                    Choose File
-                  </button>
+                    <Bot size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                    Explanations and suggestions below help you understand your level and what to
+                    improve next. Official grades may still come from your instructor.
+                  </div>
+
+                  {!evaluation && (
+                    <div style={{ padding: '0 1rem 1rem' }}>
+                      <div className={evaluateStyles.formGroup}>
+                        <label>Topic you answered</label>
+                        <input
+                          type="text"
+                          value={subject}
+                          onChange={(e) => setSubject(e.target.value)}
+                          placeholder='e.g. "Introduce yourself", "Describe your studies"'
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            marginBottom: '1rem',
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className={primaryButtonClass}
+                        onClick={handleStartEvaluation}
+                        disabled={isEvaluating || !subject.trim()}
+                        style={{ width: '100%' }}
+                      >
+                        {isEvaluating ? (
+                          <>
+                            <Loader size={16} className="spin" /> Analyzing…
+                          </>
+                        ) : (
+                          'Start AI feedback'
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {evaluationLoading && (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                      <Loader size={32} className="spin" style={{ marginBottom: '1rem' }} />
+                      <p>Processing your speech…</p>
+                    </div>
+                  )}
+
+                  {evaluation?.status === 'completed' &&
+                    (evaluation.speechMetrics ||
+                      evaluation.transcript ||
+                      evaluation.contentAnalysis) && (
+                      <>
+                        <div style={{ padding: '0 1rem' }}>
+                          <h4
+                            style={{
+                              fontSize: '0.9rem',
+                              marginBottom: '0.5rem',
+                              color: '#1e293b',
+                            }}
+                          >
+                            AI transcription
+                          </h4>
+                          <div
+                            className={evaluateStyles.transcription}
+                            style={{
+                              background: '#f8fafc',
+                              padding: '1rem',
+                              borderRadius: '8px',
+                              fontSize: '0.9rem',
+                              lineHeight: 1.6,
+                              color: '#334155',
+                              maxHeight: '200px',
+                              overflowY: 'auto',
+                              border: '1px solid #e2e8f0',
+                            }}
+                          >
+                            {evaluation.transcript ? (
+                              <p style={{ margin: 0 }}>{evaluation.transcript}</p>
+                            ) : (
+                              <p style={{ margin: 0, color: '#94a3b8' }}>
+                                No transcript for this session.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {evaluation.speechMetrics && (
+                          <div style={{ padding: '1rem' }}>
+                            <h4
+                              style={{
+                                fontSize: '0.9rem',
+                                marginBottom: '0.5rem',
+                                color: '#1e293b',
+                              }}
+                            >
+                              AI speech metrics
+                            </h4>
+                            <div
+                              className={evaluateStyles.aiMetrics}
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                gap: '0.75rem',
+                              }}
+                            >
+                              <div
+                                className={evaluateStyles.aiMetric}
+                                style={{
+                                  background: '#f8fafc',
+                                  padding: '0.75rem',
+                                  borderRadius: '8px',
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: '#64748b',
+                                    display: 'block',
+                                  }}
+                                >
+                                  Fluency
+                                </span>
+                                <div
+                                  style={{
+                                    fontSize: '1.25rem',
+                                    fontWeight: 600,
+                                    color: '#0f172a',
+                                  }}
+                                >
+                                  {evaluation.speechMetrics.fluency}%
+                                </div>
+                              </div>
+                              <div
+                                className={evaluateStyles.aiMetric}
+                                style={{
+                                  background: '#f8fafc',
+                                  padding: '0.75rem',
+                                  borderRadius: '8px',
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: '#64748b',
+                                    display: 'block',
+                                  }}
+                                >
+                                  Pronunciation
+                                </span>
+                                <div
+                                  style={{
+                                    fontSize: '1.25rem',
+                                    fontWeight: 600,
+                                    color: '#0f172a',
+                                  }}
+                                >
+                                  {evaluation.speechMetrics.pronunciation}%
+                                </div>
+                              </div>
+                              <div
+                                className={evaluateStyles.aiMetric}
+                                style={{
+                                  background: '#f8fafc',
+                                  padding: '0.75rem',
+                                  borderRadius: '8px',
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: '#64748b',
+                                    display: 'block',
+                                  }}
+                                >
+                                  Speaking pace
+                                </span>
+                                <div
+                                  style={{
+                                    fontSize: '1.25rem',
+                                    fontWeight: 600,
+                                    color: '#0f172a',
+                                  }}
+                                >
+                                  {evaluation.speechMetrics.speakingPace}{' '}
+                                  <span style={{ fontSize: '0.75rem' }}>WPM</span>
+                                </div>
+                              </div>
+                              <div
+                                className={evaluateStyles.aiMetric}
+                                style={{
+                                  background: '#f8fafc',
+                                  padding: '0.75rem',
+                                  borderRadius: '8px',
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: '#64748b',
+                                    display: 'block',
+                                  }}
+                                >
+                                  Confidence
+                                </span>
+                                <div
+                                  style={{
+                                    fontSize: '1.25rem',
+                                    fontWeight: 600,
+                                    color: '#0f172a',
+                                  }}
+                                >
+                                  {evaluation.speechMetrics.confidence}%
+                                </div>
+                              </div>
+                            </div>
+                            {evaluation.speechMetrics.details && (
+                              <div
+                                style={{
+                                  marginTop: '1rem',
+                                  padding: '0.75rem',
+                                  background: '#f1f5f9',
+                                  borderRadius: '8px',
+                                  fontSize: '0.85rem',
+                                  color: '#475569',
+                                }}
+                              >
+                                <strong>Details:</strong>{' '}
+                                {evaluation.speechMetrics.details.totalWords} words,{' '}
+                                {evaluation.speechMetrics.details.fillerWords} fillers,{' '}
+                                {typeof evaluation.speechMetrics.details
+                                  .averagePauseDuration === 'number'
+                                  ? `${evaluation.speechMetrics.details.averagePauseDuration.toFixed(2)}s avg pause`
+                                  : '—'}
+                              </div>
+                            )}
+                            {evaluation.contentScores && (
+                              <div
+                                style={{
+                                  marginTop: '1rem',
+                                  padding: '0.75rem',
+                                  background: '#f1f5f9',
+                                  borderRadius: '8px',
+                                  fontSize: '0.85rem',
+                                  color: '#475569',
+                                }}
+                              >
+                                <strong>AI content scores:</strong> Structure:{' '}
+                                {evaluation.contentScores.contentStructure || 0}%, Coherence:{' '}
+                                {evaluation.contentScores.coherence}%, Topic:{' '}
+                                {evaluation.contentScores.topicRelevance}%, Grammar:{' '}
+                                {evaluation.contentScores.grammar}%, Vocabulary:{' '}
+                                {evaluation.contentScores.vocabulary}%
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {evaluation.contentAnalysis && (
+                          <div style={{ padding: '0 1rem 1rem' }}>
+                            <h4
+                              style={{
+                                fontSize: '0.9rem',
+                                marginBottom: '0.5rem',
+                                color: '#1e293b',
+                              }}
+                            >
+                              AI narrative &amp; suggestions to improve
+                            </h4>
+                            <div
+                              style={{
+                                background: '#faf5ff',
+                                border: '1px solid #e9d5ff',
+                                borderRadius: '8px',
+                                padding: '0.85rem',
+                                fontSize: '0.85rem',
+                                color: '#4c1d95',
+                                lineHeight: 1.55,
+                              }}
+                            >
+                              <p style={{ margin: '0 0 0.5rem', fontWeight: 700 }}>
+                                Suggested CEFR (from scores): {displayedCEFR}
+                              </p>
+                              {evaluation.contentAnalysis.summary && (
+                                <p style={{ margin: '0 0 0.65rem' }}>
+                                  <strong>Explanation (summary)</strong>
+                                  <br />
+                                  {evaluation.contentAnalysis.summary}
+                                </p>
+                              )}
+                              {evaluation.contentAnalysis.keyPoints?.length > 0 && (
+                                <div style={{ marginBottom: '0.65rem' }}>
+                                  <strong>Key points you covered</strong>
+                                  <ul
+                                    style={{ margin: '0.35rem 0 0', paddingLeft: '1.2rem' }}
+                                  >
+                                    {evaluation.contentAnalysis.keyPoints.map(
+                                      (pt: string, i: number) => (
+                                        <li key={i}>{pt}</li>
+                                      ),
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                              {evaluation.contentAnalysis.strengths?.length > 0 && (
+                                <div style={{ marginBottom: '0.65rem' }}>
+                                  <strong>What went well</strong>
+                                  <ul
+                                    style={{ margin: '0.35rem 0 0', paddingLeft: '1.2rem' }}
+                                  >
+                                    {evaluation.contentAnalysis.strengths.map(
+                                      (s: string, i: number) => (
+                                        <li key={i}>{s}</li>
+                                      ),
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                              {evaluation.contentAnalysis.improvements?.length > 0 && (
+                                <div>
+                                  <strong>Suggestions to raise your level</strong>
+                                  <ul
+                                    style={{ margin: '0.35rem 0 0', paddingLeft: '1.2rem' }}
+                                  >
+                                    {evaluation.contentAnalysis.improvements.map(
+                                      (s: string, i: number) => (
+                                        <li key={i}>{s}</li>
+                                      ),
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {evalAny.detailedContentFeedback && (
+                          <div style={{ padding: '0 1rem 1rem' }}>
+                            <h4
+                              style={{
+                                fontSize: '0.9rem',
+                                marginBottom: '0.5rem',
+                                color: '#1e293b',
+                              }}
+                            >
+                              More detailed AI notes
+                            </h4>
+                            <div
+                              style={{
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                padding: '0.85rem',
+                                fontSize: '0.82rem',
+                                color: '#334155',
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {evalAny.detailedContentFeedback.structure && (
+                                <p style={{ margin: '0 0 0.5rem' }}>
+                                  <strong>Structure</strong>
+                                  <br />
+                                  {evalAny.detailedContentFeedback.structure}
+                                </p>
+                              )}
+                              {evalAny.detailedContentFeedback.contentGaps?.length ? (
+                                <div style={{ marginBottom: '0.5rem' }}>
+                                  <strong>Gaps to work on</strong>
+                                  <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.1rem' }}>
+                                    {evalAny.detailedContentFeedback.contentGaps.map(
+                                      (g: string, i: number) => (
+                                        <li key={i}>{g}</li>
+                                      ),
+                                    )}
+                                  </ul>
+                                </div>
+                              ) : null}
+                              {evalAny.detailedContentFeedback.vocabularySuggestions?.length ? (
+                                <div>
+                                  <strong>Vocabulary ideas</strong>
+                                  <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.1rem' }}>
+                                    {evalAny.detailedContentFeedback.vocabularySuggestions.map(
+                                      (g: string, i: number) => (
+                                        <li key={i}>{g}</li>
+                                      ),
+                                    )}
+                                  </ul>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        )}
+
+                        {evaluation.contentScores && evaluation.speechMetrics && (
+                          <div style={{ padding: '0 1rem 1.25rem' }}>
+                            <div className={evaluateStyles.overallScore}>
+                              <div className={evaluateStyles.scoreCircle}>
+                                <span>{holisticScore}</span>
+                                <small>/100</small>
+                              </div>
+                              <span>Holistic oral index (aligned with CEFR)</span>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                 </div>
               )}
             </div>
 
-            {/* Right: AI Feedback Panel */}
-            <div className={styles.card}>
-              <div className={practiceStyles.sectionHeader}>
-                <Bot size={20} />
-                <h3>AI Feedback</h3>
-                {evaluation?.status === 'completed' && (
-                  <span className={practiceStyles.aiBadge}>AI Generated</span>
-                )}
-              </div>
-              
-              <div className={practiceStyles.aiDisclaimer}>
-                <Bot size={14} />
-                AI-powered analysis helps you practice. Use this feedback to improve!
-              </div>
-              
-              {evaluationLoading && (
-                <div className={practiceStyles.loadingState}>
-                  <Loader size={32} className="spin" />
-                  <p>Analyzing your speech...</p>
-                </div>
-              )}
-
-              {evaluation?.status === 'completed' && evaluation.transcript && (
-                <>
-                  {/* Overall Score */}
-                  <div className={practiceStyles.overallScore}>
-                    <div className={practiceStyles.scoreCircle}>
-                      <span>{overallScore}</span>
-                      <small>/100</small>
-                    </div>
-                    <span>Overall Score</span>
-                  </div>
-
-                  {/* FINAL UNIFIED CEFR LEVEL - NEW */}
-                  <div className={practiceStyles.finalCefrContainer}>
-                    <h4>Final CEFR Level (All Criteria)</h4>
-                    <div className={practiceStyles.finalLevelDisplay}>
-                      <div className={practiceStyles.finalLevelCircle}>
-                        <span className={practiceStyles.finalLevelValue}>{finalCEFR.level}</span>
-                        <span className={practiceStyles.finalLevelScore}>{finalCEFR.score}/100</span>
-                      </div>
-                      <div className={practiceStyles.levelBreakdown}>
-                        <div className={practiceStyles.breakdownItem}>
-                          <span>Speech</span>
-                          <span>{Math.round(
-                            ((evaluation.speechMetrics?.fluency || 0) * 0.3 +
-                            (evaluation.speechMetrics?.pronunciation || 0) * 0.3 +
-                            Math.min(100, (evaluation.speechMetrics?.speakingPace || 0) / 1.8) * 0.2 +
-                            (evaluation.speechMetrics?.confidence || 0) * 0.2)
-                          )}%</span>
-                        </div>
-                        <div className={practiceStyles.breakdownItem}>
-                          <span>Content</span>
-                          <span>{Math.round(
-                            ((evaluation.contentScores?.contentStructure || 0) +
-                            (evaluation.contentScores?.coherence || 0) +
-                            (evaluation.contentScores?.topicRelevance || 0) +
-                            (evaluation.contentScores?.grammar || 0) +
-                            (evaluation.contentScores?.vocabulary || 0)) / 5
-                          )}%</span>
-                        </div>
-                        {evaluation.contentAnalysis?.cefrLevel && (
-                          <div className={practiceStyles.breakdownItem}>
-                            <span>Gemini</span>
-                            <span>{evaluation.contentAnalysis.cefrLevel}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Component Breakdown */}
-                  <div className={practiceStyles.formGroup}>
-                    <label>Component Breakdown</label>
-                    <div className={practiceStyles.levelButtons}>
-                      {['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((level) => {
-                        const isFinal = finalCEFR.level.includes(level);
-                        const isSpeech = getCEFRFromScore(overallScore) === level;
-                        const isGemini = evaluation.contentAnalysis?.cefrLevel === level;
-                        
+            <div className={evaluateStyles.rightColumn}>
+              <div className={cardClass}>
+                <h3 className={cardTitleClass}>My submission history</h3>
+                <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 0.75rem' }}>
+                  Practice and class sessions with audio. Select one to review AI feedback again.
+                </p>
+                {historyLoading ? (
+                  <p style={{ color: '#64748b' }}>Loading…</p>
+                ) : submissionHistory.length === 0 ? (
+                  <p style={{ color: '#64748b' }}>No sessions yet. Save a recording and run AI feedback.</p>
+                ) : (
+                  <div style={{ display: 'grid', gap: '0.6rem' }}>
+                    <select
+                      value={selectedHistoryId}
+                      onChange={(e) => handleHistorySelection(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.7rem',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        background: '#fff',
+                        color: '#1e293b',
+                        fontSize: '0.85rem',
+                      }}
+                    >
+                      <option value="">Select a session</option>
+                      {submissionHistory.map((row) => {
+                        const id = perfId(row.performance);
+                        if (!id) return null;
+                        const created = row.performance.createdAt
+                          ? new Date(row.performance.createdAt).toLocaleDateString()
+                          : '—';
+                        const hasAi = row.evaluation?.status === 'completed';
                         return (
-                          <button
-                            key={level}
-                            className={`${practiceStyles.levelBtn} ${
-                              isFinal ? practiceStyles.finalLevel : ''
-                            } ${
-                              isSpeech ? practiceStyles.speechLevel : ''
-                            } ${
-                              isGemini ? practiceStyles.geminiLevel : ''
-                            }`}
-                            disabled
-                          >
-                            {level}
-                          </button>
+                          <option key={id} value={id}>
+                            {row.performance.title || 'Session'} ({created})
+                            {hasAi ? ' · AI' : ''}
+                          </option>
                         );
                       })}
-                    </div>
-                    <div className={practiceStyles.legend}>
-                      <span><span className={practiceStyles.finalDot}></span> Final Level</span>
-                      <span><span className={practiceStyles.speechDot}></span> Speech-based</span>
-                      <span><span className={practiceStyles.contentDot}></span> Content (Gemini)</span>
-                    </div>
-                  </div>
+                    </select>
 
-                  {/* AI Transcription */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: '#1e293b' }}>
-                      AI Transcription
-                    </h4>
-                    <div className={practiceStyles.transcript}>
-                      <p>{evaluation.transcript}</p>
-                    </div>
-                  </div>
-
-                  {/* AI Analysis Metrics */}
-                  <div>
-                    <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: '#1e293b' }}>
-                      AI Analysis
-                    </h4>
-                    <div className={practiceStyles.aiMetrics}>
-                      <div className={practiceStyles.metricCard}>
-                        <span>Fluency</span>
-                        <strong>{evaluation.speechMetrics.fluency}%</strong>
-                      </div>
-                      <div className={practiceStyles.metricCard}>
-                        <span>Pronunciation</span>
-                        <strong>{evaluation.speechMetrics.pronunciation}%</strong>
-                      </div>
-                      <div className={practiceStyles.metricCard}>
-                        <span>Speaking Pace</span>
-                        <strong>{evaluation.speechMetrics.speakingPace} WPM</strong>
-                      </div>
-                      <div className={practiceStyles.metricCard}>
-                        <span>Confidence</span>
-                        <strong>{evaluation.speechMetrics.confidence}%</strong>
-                      </div>
-                    </div>
-
-                    <div className={practiceStyles.detailsBox}>
-                      <strong>Details:</strong> {evaluation.speechMetrics.details.totalWords} words,{' '}
-                      {evaluation.speechMetrics.details.fillerWords} filler words,{' '}
-                      {evaluation.speechMetrics.details.averagePauseDuration.toFixed(2)}s avg pause
-                    </div>
-
-                    {/* Content Scores */}
-                    {evaluation.contentScores && (
-                      <div className={practiceStyles.contentScores}>
-                        <strong>Content Scores:</strong> Structure: {evaluation.contentScores.contentStructure || 0}%, Coherence: {evaluation.contentScores.coherence}%, Topic: {evaluation.contentScores.topicRelevance}%, Grammar: {evaluation.contentScores.grammar}%, Vocabulary: {evaluation.contentScores.vocabulary}%
-                      </div>
-                    )}
-
-                    {/* Content Analysis */}
-                    {evaluation.contentAnalysis && (
-                      <div className={practiceStyles.feedbackDetails}>
-                        <h4>Summary</h4>
-                        <p>{evaluation.contentAnalysis.summary}</p>
-
-                        {evaluation.contentAnalysis.strengths.length > 0 && (
+                    {selectedRow && (
+                      <div
+                        style={{
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '10px',
+                          padding: '0.65rem 0.75rem',
+                          background: '#fafafa',
+                          fontSize: '0.8rem',
+                          color: '#334155',
+                        }}
+                      >
+                        <div>
+                          <strong>Topic:</strong> {selectedRow.performance.title || '—'}
+                        </div>
+                        <div>
+                          <strong>Status:</strong> {selectedRow.performance.status || '—'}
+                        </div>
+                        {selectedRow.evaluation?.status === 'completed' && (
                           <>
-                            <h4>Strengths</h4>
-                            <ul>
-                              {evaluation.contentAnalysis.strengths.map((s, i) => (
-                                <li key={i}>{s}</li>
-                              ))}
-                            </ul>
-                          </>
-                        )}
-
-                        {evaluation.contentAnalysis.improvements.length > 0 && (
-                          <>
-                            <h4>Areas to Improve</h4>
-                            <ul>
-                              {evaluation.contentAnalysis.improvements.map((s, i) => (
-                                <li key={i}>{s}</li>
-                              ))}
-                            </ul>
+                            <div>
+                              <strong>CEFR (AI):</strong>{' '}
+                              {selectedRow.evaluation.contentAnalysis?.cefrLevel ||
+                                (selectedRow.evaluation.contentScores &&
+                                selectedRow.evaluation.speechMetrics
+                                  ? deriveCefrLevel(
+                                      selectedRow.evaluation.contentScores,
+                                      selectedRow.evaluation.speechMetrics,
+                                    )
+                                  : '—')}
+                            </div>
+                            <div>
+                              <strong>Holistic index:</strong>{' '}
+                              {selectedRow.evaluation.contentScores &&
+                              selectedRow.evaluation.speechMetrics
+                                ? holisticOralIndex(
+                                    selectedRow.evaluation.contentScores,
+                                    selectedRow.evaluation.speechMetrics,
+                                  )
+                                : '—'}
+                              /100
+                            </div>
                           </>
                         )}
                       </div>
                     )}
                   </div>
-                </>
-              )}
+                )}
+              </div>
 
-              {!evaluation && !evaluationLoading && !evaluationError && (
-                <div className={practiceStyles.emptyState}>
-                  <Award size={48} style={{ color: 'rgba(0,0,0,0.2)' }} />
-                  <p>Record yourself and get AI feedback to improve your skills!</p>
-                  <div className={practiceStyles.metricsPreview}>
-                    <div className={practiceStyles.metricItem}>
-                      <span>Fluency</span>
-                      <span>--</span>
-                    </div>
-                    <div className={practiceStyles.metricItem}>
-                      <span>Pronunciation</span>
-                      <span>--</span>
-                    </div>
-                    <div className={practiceStyles.metricItem}>
-                      <span>Speaking Pace</span>
-                      <span>--</span>
-                    </div>
-                    <div className={practiceStyles.metricItem}>
-                      <span>Confidence</span>
-                      <span>--</span>
-                    </div>
-                    <div className={practiceStyles.metricItem}>
-                      <span>Content</span>
-                      <span>--</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <div className={cardClass}>
+                <h3 className={cardTitleClass}>Track progress</h3>
+                <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
+                  Open your dashboard for charts of scores over time and skill breakdowns from all
+                  sessions.
+                </p>
+                <button
+                  type="button"
+                  className={primaryButtonClass}
+                  style={{ width: '100%', marginTop: '1rem', justifyContent: 'center' }}
+                  onClick={() => navigate('/student/dashboard')}
+                >
+                  <BarChart3 size={16} /> View dashboard
+                </button>
+              </div>
             </div>
           </div>
         </main>
       </div>
 
       <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .spin {
-          animation: spin 1s linear infinite;
-        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
       `}</style>
     </div>
   );

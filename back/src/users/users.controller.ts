@@ -143,6 +143,32 @@ export class UsersController {
     }
   }
 
+  @Post('change-temporary-password')
+  @HttpCode(HttpStatus.OK)
+  async changeTemporaryPassword(
+    @Body()
+    body: {
+      userId: string;
+      newPassword: string;
+    },
+  ) {
+    try {
+      if (!body.userId || !body.newPassword) {
+        throw new BadRequestException(
+          'User ID and new password are required',
+        );
+      }
+
+      return await this.usersService.changeTemporaryPassword(
+        body.userId,
+        body.newPassword,
+      );
+    } catch (error) {
+      console.error('Change temporary password error:', error);
+      throw error;
+    }
+  }
+
   @Get('profile/:id')
   getProfile(@Param('id') id: string) {
     return this.usersService.getProfile(id);

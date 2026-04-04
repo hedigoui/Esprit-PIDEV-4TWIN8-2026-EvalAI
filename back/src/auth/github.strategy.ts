@@ -9,7 +9,9 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     super({
       clientID: configService.get<string>('GITHUB_CLIENT_ID') || '',
       clientSecret: configService.get<string>('GITHUB_CLIENT_SECRET') || '',
-      callbackURL: configService.get<string>('GITHUB_CALLBACK_URL') || '',
+      callbackURL:
+        configService.get<string>('GITHUB_CALLBACK_URL') ||
+        'http://localhost:3000/auth/github/callback',
       scope: ['user:email'],
     });
   }
@@ -20,13 +22,29 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     profile: any,
     done: (err: any, user: any) => void,
   ): Promise<any> {
-    const { username, emails, photos } = profile;
+    const { username, emails, photos, id } = profile;
+    const primary =
+      emails?.find((e: { primary?: boolean; value?: string }) => e.primary)?.value ||
+      emails?.[0]?.value;
+    const email =
+      primary ||
+      (username && id != null
+        ? `${id}+${username}@users.noreply.github.com`
+        : null);
+    if (!email) {
+      return done(
+        new Error('GitHub did not return an email; try making your email public or use Google.'),
+        false,
+      );
+    }
+    const nameParts = profile.displayName?.split(/\s+/) ?? [];
     const user = {
-      email: emails[0].value,
-      username: username,
-      firstName: profile.name?.givenName || username,
-      lastName: profile.name?.familyName || '',
-      picture: photos[0].value,
+      email,
+      username,
+      firstName: nameParts[0] || username || 'User',
+      lastName:
+        nameParts.slice(1).join(' ') || profile.name?.familyName || '',
+      picture: photos?.[0]?.value,
       accessToken,
       provider: 'github',
     };

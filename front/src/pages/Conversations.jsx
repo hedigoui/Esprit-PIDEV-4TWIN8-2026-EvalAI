@@ -44,20 +44,7 @@ const Conversations = () => {
 
       if (response.ok) {
         const data = await response.json();
-        
-        // Deduplicate conversations - keep only one per other participant
-        const conversationsData = data.data || [];
-        const seenParticipants = new Set();
-        const uniqueConversations = conversationsData.filter(conv => {
-          const otherParticipantId = conv.participantIds?.find(id => id !== user?.id);
-          if (!otherParticipantId || seenParticipants.has(otherParticipantId)) {
-            return false;
-          }
-          seenParticipants.add(otherParticipantId);
-          return true;
-        });
-        
-        setConversations(uniqueConversations);
+        setConversations(Array.isArray(data.data) ? data.data : []);
       } else {
         setConversations([]);
       }

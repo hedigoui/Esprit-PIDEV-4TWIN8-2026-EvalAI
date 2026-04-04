@@ -75,6 +75,9 @@ class Feedback {
 
   @Column()
   recommendations?: string[];
+
+  @Column()
+  cefrLevel?: string;
 }
 
 class Metadata {
