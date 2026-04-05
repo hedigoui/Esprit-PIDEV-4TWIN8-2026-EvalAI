@@ -131,8 +131,8 @@ export class AssemblyAIService {
         return await this.client.transcripts.transcribe({
           audio: audioBuffer,
           speech_models: ['universal'],
-          language_code: 'en_us',
-          language_detection: false,
+          language_detection: true,
+          language_code: null, // Let AssemblyAI auto-detect language
           speaker_labels: true,
           sentiment_analysis: true,
           auto_chapters: true,

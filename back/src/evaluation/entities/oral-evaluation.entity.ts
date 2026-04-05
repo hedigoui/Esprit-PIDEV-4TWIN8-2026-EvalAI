@@ -90,6 +90,12 @@ export class OralEvaluation {
   @Column({ nullable: true })
   processingTime?: number;
 
+  @Column({ default: false })
+  lowConfidenceFlag?: boolean;
+
+  @Column({ nullable: true })
+  lowConfidenceReason?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

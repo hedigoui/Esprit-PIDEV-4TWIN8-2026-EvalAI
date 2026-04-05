@@ -100,6 +100,7 @@ const Practice: React.FC = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [subject, setSubject] = useState('');
+  const [evaluationLanguage, setEvaluationLanguage] = useState<string>('en');
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [showEvaluationForm, setShowEvaluationForm] = useState(false);
   const [recordingPrepared, setRecordingPrepared] = useState(false);
@@ -318,7 +319,7 @@ const Practice: React.FC = () => {
         return;
       }
 
-      await startEvaluation(subject.trim(), currentPerformance._id);
+      await startEvaluation(subject.trim(), currentPerformance._id, evaluationLanguage);
       const refreshed = await oralPerformanceService.getPerformance(
         currentPerformance._id,
       );
@@ -756,6 +757,23 @@ const Practice: React.FC = () => {
 
                   {!evaluation && (
                     <div style={{ padding: '0 1rem 1rem' }}>
+                      <div className={evaluateStyles.formGroup}>
+                        <label>Language</label>
+                        <select
+                          value={evaluationLanguage}
+                          onChange={(e) => setEvaluationLanguage(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            marginBottom: '1rem'
+                          }}
+                        >
+                          <option value="en">English</option>
+                          <option value="fr">French (Français)</option>
+                        </select>
+                      </div>
                       <div className={evaluateStyles.formGroup}>
                         <label>Topic you answered</label>
                         <input

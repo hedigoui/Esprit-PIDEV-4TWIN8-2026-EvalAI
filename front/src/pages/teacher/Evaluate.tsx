@@ -77,6 +77,7 @@ const Evaluate: React.FC = () => {
   
   // Evaluation states
   const [subject, setSubject] = useState<string>('');
+  const [evaluationLanguage, setEvaluationLanguage] = useState<string>('en');
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [showEvaluationForm, setShowEvaluationForm] = useState<boolean>(false);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
@@ -464,7 +465,7 @@ useEffect(() => {
     }
 
     const perfId = currentPerformance._id;
-    await startEvaluation(subject.trim(), perfId);
+    await startEvaluation(subject.trim(), perfId, evaluationLanguage);
 
     const idToRefresh = perfId;
     if (idToRefresh) {
@@ -946,6 +947,23 @@ useEffect(() => {
                   
                   {!evaluation && (
                     <div style={{ padding: '1.5rem' }}>
+                      <div className={evaluateStyles?.formGroup || 'form-group'}>
+                        <label>Language</label>
+                        <select
+                          value={evaluationLanguage}
+                          onChange={(e) => setEvaluationLanguage(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            marginBottom: '1rem'
+                          }}
+                        >
+                          <option value="en">English</option>
+                          <option value="fr">French (Français)</option>
+                        </select>
+                      </div>
                       <div className={evaluateStyles?.formGroup || 'form-group'}>
                         <label>Subject/Topic</label>
                         <input

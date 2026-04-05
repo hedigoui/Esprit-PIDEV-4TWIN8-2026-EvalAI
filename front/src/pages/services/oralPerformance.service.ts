@@ -225,11 +225,11 @@ export const oralPerformanceService = {
   // ===========================================
 
   // Start a new evaluation
-  async startEvaluation(performanceId: string, subject: string) {
+  async startEvaluation(performanceId: string, subject: string, language: string = 'en') {
     const response = await fetch(`${API_URL}/evaluations/performance/${performanceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject }),
+      body: JSON.stringify({ subject, language }),
     });
     if (!response.ok) {
       throw new Error(await readFetchError(response, `Failed to start evaluation: ${response.statusText}`));

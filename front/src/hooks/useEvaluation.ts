@@ -60,7 +60,11 @@ export const useEvaluation = ({ performanceId, autoPoll = true }: UseEvaluationP
    * @param overridePerformanceId — pass after create/upload so the API runs before React
    *   re-renders with the new `performanceId` (fixes "first click does nothing").
    */
-  const startEvaluation = async (subject: string, overridePerformanceId?: string) => {
+  const startEvaluation = async (
+    subject: string,
+    overridePerformanceId?: string,
+    language: string = 'en'
+  ) => {
     const id = overridePerformanceId ?? performanceId;
     if (!id) {
       throw new Error('No performance ID');
@@ -70,7 +74,7 @@ export const useEvaluation = ({ performanceId, autoPoll = true }: UseEvaluationP
       setIsLoading(true);
       setError(null);
 
-      const result = await oralPerformanceService.startEvaluation(id, subject);
+      const result = await oralPerformanceService.startEvaluation(id, subject, language);
       setEvaluation(result);
 
       if (autoPoll && result && result.status === 'processing') {

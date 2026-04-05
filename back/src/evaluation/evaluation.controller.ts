@@ -10,8 +10,9 @@ export class EvaluationController {
   async evaluate(
     @Param('performanceId') performanceId: string,
     @Body('subject') subject: string,
+    @Body('language') language: string = 'en', // Default to English
   ) {
-    return this.evaluationService.evaluatePerformance(performanceId, subject);
+    return this.evaluationService.evaluatePerformance(performanceId, subject, language);
   }
 
   @Get('performance/:performanceId')
