@@ -58,11 +58,11 @@ export function holisticOralIndex(
 }
 
 export function indexToCefr(index: number): CefrLevel {
-  if (index <= 37) return 'A1';
-  if (index <= 47) return 'A2';
-  if (index <= 57) return 'B1';
-  if (index <= 68) return 'B2';
-  if (index <= 80) return 'C1';
+  if (index <= 43) return 'A1';
+  if (index <= 54) return 'A2';
+  if (index <= 65) return 'B1';
+  if (index <= 76) return 'B2';
+  if (index <= 87) return 'C1';
   return 'C2';
 }
 

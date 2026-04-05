@@ -1240,14 +1240,12 @@ const Practice: React.FC = () => {
                           <>
                             <div>
                               <strong>CEFR (AI):</strong>{' '}
-                              {selectedRow.evaluation.contentAnalysis?.cefrLevel ||
-                                (selectedRow.evaluation.contentScores &&
-                                selectedRow.evaluation.speechMetrics
-                                  ? deriveCefrLevel(
-                                      selectedRow.evaluation.contentScores,
-                                      selectedRow.evaluation.speechMetrics,
-                                    )
-                                  : '—')}
+                              {selectedRow.evaluation.contentScores
+                                ? deriveCefrLevel(
+                                    selectedRow.evaluation.contentScores,
+                                    selectedRow.evaluation.speechMetrics,
+                                  )
+                                : '—'}
                             </div>
                             <div>
                               <strong>Holistic index:</strong>{' '}

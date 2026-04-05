@@ -66,7 +66,6 @@ interface StudentProfile {
 const Evaluate: React.FC = () => {
   const navigate = useNavigate();
   const { studentId, performanceId } = useParams<{ studentId: string; performanceId: string }>();
-  const effectiveStudentId = studentId ?? '';
   
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [recordMode, setRecordMode] = useState<'upload' | 'record'>('record');
@@ -80,6 +79,10 @@ const Evaluate: React.FC = () => {
   const [evaluationLanguage, setEvaluationLanguage] = useState<string>('en');
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [showEvaluationForm, setShowEvaluationForm] = useState<boolean>(false);
+  const [searchEmail, setSearchEmail] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<StudentProfile[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [instructorHistory, setInstructorHistory] = useState<Performance[]>([]);
   const [studentProfiles, setStudentProfiles] = useState<Record<string, StudentProfile>>({});
@@ -87,6 +90,8 @@ const Evaluate: React.FC = () => {
   const [selectedHistoryId, setSelectedHistoryId] = useState<string>('');
   const [recordingPrepared, setRecordingPrepared] = useState<boolean>(false);
   const [evaluateeProfile, setEvaluateeProfile] = useState<StudentProfile | null>(null);
+
+  const effectiveStudentId = (selectedStudent?._id || studentId) ?? '';
 
   /** Prevents re-applying AI rubric on every evaluation poll; cleared on new performance / new eval. */
   const aiRubricImportedForPerformanceId = useRef<string | null>(null);
@@ -143,6 +148,13 @@ useEffect(() => {
     loadInstructorHistory();
   }
 }, [instructorId]);
+
+  // Update profile when selected student changes
+  useEffect(() => {
+    if (selectedStudent) {
+      setEvaluateeProfile(selectedStudent);
+    }
+  }, [selectedStudent]);
 
   const evaluateeStudentKey = effectiveStudentId || performance?.studentId || '';
 
@@ -421,6 +433,51 @@ useEffect(() => {
     }
   };
 
+  const handleSearchStudent = async (): Promise<void> => {
+    if (!searchEmail.trim()) {
+      alert('Please enter a student email');
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      setSearchResults([]);
+      
+      // Fetch all students and filter by email
+      const response = await fetch('http://localhost:3000/users/students');
+      if (!response.ok) {
+        throw new Error('Failed to fetch students');
+      }
+      
+      const students = await response.json();
+      const filtered = (Array.isArray(students) ? students : students.data || [])
+        .filter((s: StudentProfile) => 
+          s.email?.toLowerCase().includes(searchEmail.toLowerCase())
+        );
+      
+      setSearchResults(filtered);
+      
+      if (filtered.length === 0) {
+        alert('No students found with that email');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      alert('Failed to search students');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSelectStudent = (student: StudentProfile): void => {
+    setSelectedStudent(student);
+    setSearchResults([]);
+    setSearchEmail('');
+    // Reset form when selecting new student
+    setPerformance(null);
+    setSubject('');
+    setShowEvaluationForm(false);
+  };
+
  const handleStartEvaluation = async (): Promise<void> => {
   if (!subject.trim()) {
     alert('Please enter a subject/topic for evaluation');
@@ -664,6 +721,130 @@ useEffect(() => {
 
           <AiDisclosureNotice />
 
+          {/* Student Search Section */}
+          {!selectedStudent && (
+            <div style={{
+              background: '#f0f9ff',
+              border: '2px solid #0284c7',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{ marginTop: 0, marginBottom: '1rem', color: '#0c63e4' }}>
+                🔍 Search for a Student
+              </h2>
+              <p style={{ color: '#475569', marginBottom: '1rem' }}>
+                Enter a student's email to search and select them for evaluation
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+                <input
+                  type="email"
+                  placeholder="Enter student email (e.g., ahmed@example.com)"
+                  value={searchEmail}
+                  onChange={(e) => setSearchEmail(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearchStudent()}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '1rem'
+                  }}
+                />
+                <button
+                  onClick={handleSearchStudent}
+                  disabled={isSearching || !searchEmail.trim()}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: isSearching ? '#cbd5e1' : '#0284c7',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: isSearching ? 'not-allowed' : 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  {isSearching ? 'Searching...' : 'Search'}
+                </button>
+              </div>
+
+              {/* Search Results */}
+              {searchResults.length > 0 && (
+                <div>
+                  <p style={{ marginBottom: '0.75rem', fontWeight: '600', color: '#1e293b' }}>
+                    Found {searchResults.length} student{searchResults.length !== 1 ? 's' : ''}:
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {searchResults.map((student) => (
+                      <button
+                        key={student._id}
+                        onClick={() => handleSelectStudent(student)}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          backgroundColor: '#white',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                      >
+                        <strong>{student.firstName} {student.lastName}</strong>
+                        <br />
+                        <small style={{ color: '#64748b' }}>{student.email}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Selected Student Display */}
+          {selectedStudent && (
+            <div style={{
+              background: '#dcfce7',
+              border: '2px solid #22c55e',
+              borderRadius: '12px',
+              padding: '1rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <strong style={{ color: '#166534' }}>Selected Student:</strong>
+                <div style={{ color: '#15803d' }}>
+                  {selectedStudent.firstName} {selectedStudent.lastName}
+                </div>
+                <small style={{ color: '#4b5563' }}>{selectedStudent.email}</small>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedStudent(null);
+                  setPerformance(null);
+                  setSubject('');
+                  setShowEvaluationForm(false);
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                Change Student
+              </button>
+            </div>
+          )}
+
+          <AiDisclosureNotice />
+
           {/* Status Messages */}
           {uploadError && (
             <div style={{ 
@@ -765,6 +946,20 @@ useEffect(() => {
             </div>
           )}
 
+          {/* Only show recording interface when a student is selected */}
+          {!selectedStudent && (
+            <div style={{
+              textAlign: 'center',
+              padding: '3rem 1rem',
+              color: '#64748b'
+            }}>
+              <p style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+                👆 Please search and select a student above to begin the evaluation.
+              </p>
+            </div>
+          )}
+
+          {selectedStudent && (
           <div className={evaluateStyles?.evaluateGrid || 'evaluate-grid'}>
             {/* Left: Video/Audio Player */}
             <div className={evaluateStyles?.leftColumn || 'left-column'}>
@@ -1383,6 +1578,7 @@ useEffect(() => {
               </div>
             </div>
           </div>
+          )}
         </main>
       </div>
 
