@@ -1,0 +1,591 @@
+/* ===== Split-Screen Login Layout ===== */
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: row;
+}
+
+/* ===== LEFT BRANDED PANEL ===== */
+.leftPanel {
+  flex: 0 0 45%;
+  background: linear-gradient(160deg, #E31837 0%, #c41230 40%, #9b0e26 100%);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3rem;
+}
+
+.leftContent {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.brandLogo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logoCircle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logoText {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: 3px;
+  display: flex;
+}
+
+.letterWhite {
+  color: #ffffff;
+}
+
+.letterLight {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.welcomeText h1 {
+  color: #ffffff;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.welcomeSubtext {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1rem;
+  margin-top: 0.75rem;
+  line-height: 1.5;
+}
+
+.illustrationArea {
+  margin: 1rem 0;
+}
+
+.featureList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+}
+
+.featureDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.tagline {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.9rem;
+  font-style: italic;
+  margin: 0;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Decorative circles */
+.circle1 {
+  position: absolute;
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  top: -60px;
+  right: -60px;
+}
+
+.circle2 {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  bottom: 80px;
+  right: 40px;
+}
+
+.circle3 {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  bottom: -30px;
+  left: 30%;
+}
+
+/* ===== RIGHT FORM PANEL ===== */
+.rightPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  background: #fafafa;
+  position: relative;
+  overflow-y: auto;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.formWrapper {
+  width: 100%;
+  max-width: 420px;
+  animation: fadeUp 0.5s ease-out;
+}
+
+.formHeader {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  color: #1a1a2e;
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0 0 0.4rem 0;
+}
+
+.subtitle {
+  color: #888;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* ===== ERROR MESSAGE ===== */
+.errorMessage {
+  background: #ffebee;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  color: #c62828;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* ===== ROLE SELECTOR ===== */
+.roleSelector {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.roleButton {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.5rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  background: white;
+  color: #888;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.roleButton:hover {
+  border-color: #E31837;
+  color: #E31837;
+}
+
+.activeRole {
+  border-color: #E31837;
+  background: rgba(227, 24, 55, 0.08);
+  color: #E31837;
+  font-weight: 600;
+}
+
+/* ===== FORM ===== */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.inputWrapper {
+  position: relative;
+}
+
+.input {
+  width: 100%;
+  padding: 0.8rem 2.75rem 0.8rem 1rem;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #333;
+  background: white;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #E31837;
+  box-shadow: 0 0 0 3px rgba(227, 24, 55, 0.08);
+}
+
+.input::placeholder {
+  color: #aaa;
+}
+
+.inputIcon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+  pointer-events: none;
+}
+
+.eyeButton {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eyeButton:hover {
+  color: #E31837;
+}
+
+/* ===== OPTIONS ROW (Remember Me + Forgot) ===== */
+.optionsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rememberMe {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #555;
+  cursor: pointer;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #E31837;
+  cursor: pointer;
+}
+
+.forgotLink {
+  color: #E31837;
+  font-size: 0.85rem;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.forgotLink:hover {
+  text-decoration: underline;
+}
+
+/* ===== LOGIN BUTTON ===== */
+.loginButton {
+  width: 100%;
+  padding: 0.85rem;
+  background: linear-gradient(135deg, #E31837, #c41230);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin-top: 0.25rem;
+}
+
+.loginButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(227, 24, 55, 0.35);
+}
+
+/* ===== DIVIDER ===== */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dividerLine {
+  flex: 1;
+  height: 1px;
+  background: #ddd;
+}
+
+.dividerText {
+  font-size: 0.8rem;
+  color: #999;
+  white-space: nowrap;
+}
+
+/* ===== SOCIAL BUTTONS ===== */
+.socialButtons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.socialButton {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  color: #333;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.socialButton:hover {
+  border-color: #333;
+  background: #1a1a2e;
+  color: white;
+}
+
+.googleButton:hover {
+  border-color: #4285F4;
+  background: white;
+  color: #333;
+  box-shadow: 0 2px 8px rgba(66, 133, 244, 0.2);
+}
+
+/* ===== SIGNUP LINK ===== */
+.signupLink {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #888;
+  margin: 0;
+}
+
+.signupLink a {
+  color: #E31837;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.signupLink a:hover {
+  text-decoration: underline;
+  transform: translateX(2px);
+}
+
+/* ===== FOOTER ===== */
+.footer {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  color: #aaa;
+  font-size: 0.8rem;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .container {
+    flex-direction: column;
+  }
+
+  .leftPanel {
+    flex: none;
+    padding: 2rem 1.5rem;
+    min-height: auto;
+  }
+
+  .welcomeText h1 {
+    font-size: 1.6rem;
+  }
+
+  .illustrationArea {
+    display: none;
+  }
+
+  .rightPanel {
+    padding: 2rem 1.5rem;
+  }
+
+  .footer {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    margin-top: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .leftPanel {
+    padding: 1.5rem 1rem;
+  }
+
+  .welcomeText h1 {
+    font-size: 1.3rem;
+  }
+
+  .roleSelector {
+    flex-direction: column;
+  }
+
+  .socialButtons {
+    flex-direction: column;
+  }
+}
+/* ===== ANIMATIONS ===== */
+.fadeIn {
+  opacity: 1;
+  transform: translateX(0);
+  animation: slideIn 0.3s ease-in-out;
+}
+
+.fadeOut {
+  opacity: 0;
+  transform: translateX(20px);
+  pointer-events: none;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dark theme (saved in Settings / localStorage, applied on <html>) */
+:global([data-theme='dark']) .rightPanel {
+  background: var(--bg-main);
+}
+
+:global([data-theme='dark']) .title {
+  color: var(--text-primary);
+}
+
+:global([data-theme='dark']) .subtitle {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .label {
+  color: var(--text-secondary);
+}
+
+:global([data-theme='dark']) .roleButton {
+  background: var(--bg-card-solid);
+  border-color: var(--border-light);
+  color: var(--text-secondary);
+}
+
+:global([data-theme='dark']) .activeRole {
+  background: var(--primary-soft);
+}
+
+:global([data-theme='dark']) .input {
+  background: var(--bg-card-solid);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+:global([data-theme='dark']) .input::placeholder {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .rememberMe {
+  color: var(--text-secondary);
+}
+
+:global([data-theme='dark']) .dividerLine {
+  background: var(--border-light);
+}
+
+:global([data-theme='dark']) .dividerText {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .socialButton {
+  background: var(--bg-card-solid);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+:global([data-theme='dark']) .signupLink {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .footer {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .inputIcon,
+:global([data-theme='dark']) .eyeButton {
+  color: var(--text-muted);
+}

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E31837"/>
+      <stop offset="50%" style="stop-color:#666666"/>
+      <stop offset="100%" style="stop-color:#1a1a1a"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background circle with gradient -->
+  <circle cx="100" cy="100" r="90" fill="url(#bgGradient)"/>
+  <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+  
+  <!-- Microphone body -->
+  <rect x="75" y="45" width="50" height="70" rx="25" fill="white"/>
+  
+  <!-- Microphone grille lines - alternating colors -->
+  <line x1="85" y1="60" x2="115" y2="60" stroke="#E31837" stroke-width="2" stroke-linecap="round"/>
+  <line x1="85" y1="72" x2="115" y2="72" stroke="#666666" stroke-width="2" stroke-linecap="round"/>
+  <line x1="85" y1="84" x2="115" y2="84" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+  <line x1="85" y1="96" x2="115" y2="96" stroke="#E31837" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Microphone stand arc -->
+  <path d="M 60 90 Q 60 130 100 130 Q 140 130 140 90" fill="none" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Microphone stand -->
+  <line x1="100" y1="130" x2="100" y2="155" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Sound waves - left (red and grey) -->
+  <path d="M 45 70 Q 35 85 45 100" fill="none" stroke="#E31837" stroke-width="4" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M 35 60 Q 20 85 35 110" fill="none" stroke="#888888" stroke-width="3" stroke-linecap="round" filter="url(#glow)"/>
+  
+  <!-- Sound waves - right (grey and red) -->
+  <path d="M 155 70 Q 165 85 155 100" fill="none" stroke="#E31837" stroke-width="4" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M 165 60 Q 180 85 165 110" fill="none" stroke="#888888" stroke-width="3" stroke-linecap="round" filter="url(#glow)"/>
+  
+  <!-- AI indicator dots - red, grey, black pattern -->
+  <circle cx="100" cy="175" r="4" fill="#E31837" filter="url(#glow)"/>
+  <circle cx="85" cy="172" r="3" fill="#888888" filter="url(#glow)"/>
+  <circle cx="115" cy="172" r="3" fill="#1a1a1a" filter="url(#glow)"/>
+  <line x1="88" y1="172" x2="97" y2="175" stroke="#666666" stroke-width="1.5"/>
+  <line x1="103" y1="175" x2="112" y2="172" stroke="#666666" stroke-width="1.5"/>
+</svg>

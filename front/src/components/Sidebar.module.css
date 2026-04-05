@@ -1,0 +1,131 @@
+.sidebar {
+  width: 240px;
+  background: linear-gradient(180deg, #0f0f1a 0%, #161625 50%, #1a1a2e 100%);
+  padding: 1.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle side glow */
+.sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(227, 24, 55, 0.3) 30%,
+    rgba(227, 24, 55, 0.5) 50%,
+    rgba(227, 24, 55, 0.3) 70%,
+    transparent 100%
+  );
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 2.5rem;
+}
+
+.logoIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.logoText {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 3px;
+  display: flex;
+}
+
+.letterRed {
+  color: #E31837;
+  text-shadow: 0 0 20px rgba(227, 24, 55, 0.4);
+}
+
+.letterGrey {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.letterBlack {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  padding: 0 0.25rem;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  color: rgba(255, 255, 255, 0.45);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-smooth);
+  font-size: 0.875rem;
+  font-weight: 500;
+  position: relative;
+}
+
+.navItem:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.navItem.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, rgba(227, 24, 55, 0.2), rgba(227, 24, 55, 0.08));
+  box-shadow: 0 0 20px rgba(227, 24, 55, 0.1);
+}
+
+.navItem.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: #E31837;
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 8px rgba(227, 24, 55, 0.6);
+}
+
+.footer {
+  margin-top: auto;
+  padding: 0.75rem 0.25rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.logoutButton {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  color: rgba(255, 255, 255, 0.45);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-smooth);
+  font-size: 0.875rem;
+  font-weight: 500;
+  width: 100%;
+}
+
+.logoutButton:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
