@@ -194,7 +194,20 @@
     "beginner": "Beginner",
     "intermediate": "Intermediate",
     "advanced": "Advanced",
-    "proficient": "Proficient"
+    "proficient": "Proficient",
+    "evaluations": "Evaluations",
+    "userDistribution": "User Distribution",
+    "platformOverview": "Platform overview and management",
+    "userGrowth": "User Growth",
+    "newRegistrationsOverTime": "New registrations over time",
+    "monthlyEvaluations": "Monthly Evaluations",
+    "recentActivity": "Recent Activity",
+    "viewAll": "View all",
+    "newStudentRegistered": "New student registered",
+    "evaluationCompleted": "Evaluation completed",
+    "newInstructorAdded": "New instructor added",
+    "aiAnalysisCompleted": "AI analysis completed",
+    "passwordReset": "Password reset"
   },
   "practice": {
     "title": "Practice Session",

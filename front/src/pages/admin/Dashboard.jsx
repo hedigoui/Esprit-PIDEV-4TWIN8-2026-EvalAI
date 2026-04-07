@@ -15,13 +15,13 @@ const activityData = [
   { date: 'Jun', users: 210 },
 ];
 
-const userDistribution = [
-  { name: 'Students', value: 450, color: '#E31837' },
-  { name: 'Instructors', value: 35, color: '#22c55e' },
-  { name: 'Admins', value: 5, color: '#3b82f6' },
+const getUserDistribution = (t) => [
+  { name: t('admin.students'), value: 450, color: '#E31837' },
+  { name: t('admin.instructors'), value: 35, color: '#22c55e' },
+  { name: t('admin.admins'), value: 5, color: '#3b82f6' },
 ];
 
-const evaluationsData = [
+const getEvaluationsData = () => [
   { month: 'Jan', count: 280 },
   { month: 'Feb', count: 320 },
   { month: 'Mar', count: 350 },
@@ -30,12 +30,12 @@ const evaluationsData = [
   { month: 'Jun', count: 420 },
 ];
 
-const recentActivity = [
-  { id: 1, action: 'New student registered', user: 'Sarah Miller', time: '2 min ago', icon: '👤', accent: '#3b82f6' },
-  { id: 2, action: 'Evaluation completed', user: 'Dr. Smith → Hedi Goui', time: '15 min ago', icon: '✅', accent: '#22c55e' },
-  { id: 3, action: 'New instructor added', user: 'Prof. Johnson', time: '1 hour ago', icon: '🧑‍🏫', accent: '#8b5cf6' },
-  { id: 4, action: 'AI analysis completed', user: 'System', time: '2 hours ago', icon: '🤖', accent: '#f97316' },
-  { id: 5, action: 'Password reset', user: 'Ahmed Hassan', time: '3 hours ago', icon: '🔒', accent: '#64748b' },
+const getRecentActivity = (t) => [
+  { id: 1, action: t('admin.newStudentRegistered') || 'New student registered', user: 'Sarah Miller', time: '2 min ago', icon: '👤', accent: '#3b82f6' },
+  { id: 2, action: t('admin.evaluationCompleted') || 'Evaluation completed', user: 'Dr. Smith → Hedi Goui', time: '15 min ago', icon: '✅', accent: '#22c55e' },
+  { id: 3, action: t('admin.newInstructorAdded') || 'New instructor added', user: 'Prof. Johnson', time: '1 hour ago', icon: '🧑‍🏫', accent: '#8b5cf6' },
+  { id: 4, action: t('admin.aiAnalysisCompleted') || 'AI analysis completed', user: 'System', time: '2 hours ago', icon: '🤖', accent: '#f97316' },
+  { id: 5, action: t('admin.passwordReset') || 'Password reset', user: 'Ahmed Hassan', time: '3 hours ago', icon: '🔒', accent: '#64748b' },
 ];
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -140,6 +140,11 @@ const AdminDashboard = () => {
     }
   }, [navigate]);
 
+  // Call the translated data functions
+  const userDistribution = getUserDistribution(t);
+  const evaluationsData = getEvaluationsData();
+  const recentActivity = getRecentActivity(t);
+
   return (
     <div className={styles.layout}>
       <AdminSidebar />
@@ -154,9 +159,9 @@ const AdminDashboard = () => {
                 <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>System OK</span>
               </div>
               <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1a1a2e', letterSpacing: '-0.03em', lineHeight: '1.2' }}>
-                Admin Dashboard
+                {t('admin.dashboard')}
               </h1>
-              <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.3rem' }}>Platform overview and management</p>
+              <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.3rem' }}>{t('admin.platformOverview')}</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button style={{
@@ -213,7 +218,7 @@ const AdminDashboard = () => {
               <div style={{ position: 'absolute', bottom: '-10px', right: '20px', width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
               <Users size={20} style={{ opacity: 0.7, marginBottom: '0.75rem' }} />
               <div style={{ fontSize: '2.2rem', fontWeight: '800', letterSpacing: '-0.04em', lineHeight: '1' }}>490</div>
-              <div style={{ fontSize: '0.72rem', opacity: 0.75, marginTop: '0.2rem', fontWeight: '500' }}>Total Users</div>
+              <div style={{ fontSize: '0.72rem', opacity: 0.75, marginTop: '0.2rem', fontWeight: '500' }}>{t('admin.totalUsers')}</div>
             </div>
 
             {/* Students */}
@@ -230,7 +235,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
               <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#1a1a2e', letterSpacing: '-0.04em', lineHeight: '1' }}>450</div>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem', fontWeight: '500' }}>Students</div>
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem', fontWeight: '500' }}>{t('admin.students')}</div>
             </div>
 
             {/* Instructors */}
@@ -242,7 +247,7 @@ const AdminDashboard = () => {
                 <User size={18} />
               </div>
               <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#1a1a2e', letterSpacing: '-0.04em', lineHeight: '1' }}>35</div>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem', fontWeight: '500' }}>Instructors</div>
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem', fontWeight: '500' }}>{t('admin.instructors')}</div>
             </div>
 
             {/* Evaluations */}
@@ -257,7 +262,7 @@ const AdminDashboard = () => {
                 <TrendingUp size={14} style={{ color: '#22c55e' }} />
               </div>
               <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#1a1a2e', letterSpacing: '-0.04em', lineHeight: '1' }}>2.1K</div>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem', fontWeight: '500' }}>Evaluations</div>
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem', fontWeight: '500' }}>{t('admin.evaluations')}</div>
             </div>
           </div>
 
@@ -270,8 +275,8 @@ const AdminDashboard = () => {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <div>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>User Growth</h3>
-                  <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.15rem' }}>New registrations over time</p>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>{t('admin.userGrowth')}</h3>
+                  <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.15rem' }}>{t('admin.newRegistrationsOverTime')}</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', fontWeight: '600', color: '#22c55e' }}>
                   <ArrowUpRight size={14} /> +75% YoY
@@ -303,7 +308,7 @@ const AdminDashboard = () => {
               border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem',
               display: 'flex', flexDirection: 'column',
             }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e', marginBottom: '0.5rem' }}>User Distribution</h3>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e', marginBottom: '0.5rem' }}>{t('admin.userDistribution')}</h3>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <ResponsiveContainer width="100%" height={140}>
                   <PieChart>
@@ -337,7 +342,7 @@ const AdminDashboard = () => {
               border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem',
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>Monthly Evaluations</h3>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>{t('admin.monthlyEvaluations')}</h3>
               </div>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={evaluationsData} barCategoryGap="30%">
@@ -362,8 +367,8 @@ const AdminDashboard = () => {
               border: '1px solid rgba(0,0,0,0.06)', borderRadius: '20px', padding: '1.5rem',
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>Recent Activity</h3>
-                <span style={{ fontSize: '0.68rem', fontWeight: '600', color: '#E31837', cursor: 'pointer' }}>View all →</span>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1a1a2e' }}>{t('admin.recentActivity')}</h3>
+                <span style={{ fontSize: '0.68rem', fontWeight: '600', color: '#E31837', cursor: 'pointer' }}>{t('admin.viewAll')} →</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {recentActivity.map((activity) => (

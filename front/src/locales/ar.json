@@ -194,7 +194,20 @@
     "beginner": "مبتدئ",
     "intermediate": "متوسط",
     "advanced": "متقدم",
-    "proficient": "بارع"
+    "proficient": "بارع",
+    "evaluations": "التقييمات",
+    "userDistribution": "توزيع المستخدمين",
+    "platformOverview": "نظرة عامة على المنصة والإدارة",
+    "userGrowth": "نمو المستخدمين",
+    "newRegistrationsOverTime": "التسجيلات الجديدة بمرور الوقت",
+    "monthlyEvaluations": "التقييمات الشهرية",
+    "recentActivity": "النشاط الأخير",
+    "viewAll": "عرض الكل",
+    "newStudentRegistered": "تم تسجيل طالب جديد",
+    "evaluationCompleted": "تم إكمال التقييم",
+    "newInstructorAdded": "تم إضافة مدرب جديد",
+    "aiAnalysisCompleted": "تم إكمال التحليل الذكي",
+    "passwordReset": "إعادة تعيين كلمة المرور"
   },
   "practice": {
     "title": "جلسة الممارسة",

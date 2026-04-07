@@ -194,7 +194,20 @@
     "beginner": "Débutant",
     "intermediate": "Intermédiaire",
     "advanced": "Avancé",
-    "proficient": "Compétent"
+    "proficient": "Compétent",
+    "evaluations": "Évaluations",
+    "userDistribution": "Distribution des utilisateurs",
+    "platformOverview": "Aperçu de la plateforme et gestion",
+    "userGrowth": "Croissance des utilisateurs",
+    "newRegistrationsOverTime": "Nouvelles inscriptions au fil du temps",
+    "monthlyEvaluations": "Évaluations mensuelles",
+    "recentActivity": "Activité récente",
+    "viewAll": "Voir tout",
+    "newStudentRegistered": "Nouveau student enregistré",
+    "evaluationCompleted": "Évaluation complétée",
+    "newInstructorAdded": "Nouvel instructeur ajouté",
+    "aiAnalysisCompleted": "Analyse IA complétée",
+    "passwordReset": "Réinitialisation du mot de passe"
   },
   "practice": {
     "title": "Session de pratique",

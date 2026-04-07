@@ -11,6 +11,7 @@ import ResetPassword from './pages/ResetPassword';
 import VoiceAssistant from './components/accessibility/VoiceAssistant';
 import ReadSelectionComponent from './components/accessibility/ReadSelectionComponent';
 import LanguageSwitcher from './components/accessibility/LanguageSwitcher';
+import AccessibilityPanel from './components/accessibility/AccessibilityPanel';
 
 // Student Pages
 import StudentDashboard from './pages/student/Dashboard';
@@ -38,6 +39,7 @@ function App() {
   return (
     <Router>
       <LanguageSwitcher />
+      <AccessibilityPanel />
       <ReadSelectionComponent />
       <VoiceAssistant />
       <Routes>
