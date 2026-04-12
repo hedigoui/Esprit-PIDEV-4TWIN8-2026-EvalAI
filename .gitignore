@@ -2,3 +2,5 @@ back/.env
 back/.env
 .env
 .env.*
+!.env.example
+!.back/.env.example
