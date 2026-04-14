@@ -4,6 +4,7 @@ import TeacherSidebar from '../components/TeacherSidebar';
 import StudentSidebar from '../components/StudentSidebar';
 import AdminSidebar from '../components/AdminSidebar';
 import styles from '../styles/shared.module.css';
+import { useI18n } from '../i18n/I18nProvider';
 
 const MessageTest = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const MessageTest = () => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState('');
+  const { t } = useI18n();
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user') || '{}');
@@ -48,7 +50,7 @@ const MessageTest = () => {
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!selectedUser || !message.trim()) {
-      setResult('❌ Please select a user and enter a message');
+      setResult(`❌ ${t('messageTest.resultSelectUser')}`);
       return;
     }
 
@@ -58,7 +60,7 @@ const MessageTest = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        setResult('❌ No authentication token found. Please login first.');
+        setResult(`❌ ${t('messageTest.resultNoToken')}`);
         setLoading(false);
         return;
       }
@@ -79,14 +81,14 @@ const MessageTest = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setResult(`✅ Message sent successfully to ${testUsers.find(u => u.id === selectedUser)?.name}`);
+        setResult(`✅ ${t('messageTest.resultSent', { name: testUsers.find(u => u.id === selectedUser)?.name || '' })}`);
         setMessage('');
       } else {
-        setResult(`❌ Error: ${data.message || 'Failed to send message'}`);
+        setResult(`❌ ${t('messageTest.resultError', { message: data.message || t('messageTest.resultFailed') })}`);
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      setResult(`❌ Network error: ${error.message}`);
+      setResult(`❌ ${t('messageTest.resultNetwork', { message: error.message })}`);
     } finally {
       setLoading(false);
     }
@@ -104,8 +106,8 @@ const MessageTest = () => {
           {/* Page Header */}
           <div className={styles.pageHeader}>
             <div>
-              <h1 className={styles.pageTitle}>Message Test</h1>
-              <p className={styles.pageSubtitle}>Test messaging between users</p>
+                <h1 className={styles.pageTitle}>{t('messageTest.title')}</h1>
+                <p className={styles.pageSubtitle}>{t('messageTest.sub')}</p>
             </div>
           </div>
 
@@ -118,7 +120,7 @@ const MessageTest = () => {
             marginBottom: '2rem',
           }}>
             <h3 style={{ color: 'var(--text-primary)', marginBottom: '1rem' }}>
-              Current User: {user?.firstName} {user?.lastName} ({user?.role})
+                {t('messageTest.currentUser')}: {user?.firstName} {user?.lastName} ({user?.role})
             </h3>
           </div>
 
@@ -131,7 +133,7 @@ const MessageTest = () => {
             marginBottom: '2rem',
           }}>
             <h3 style={{ color: 'var(--text-primary)', marginBottom: '1rem' }}>
-              Test Users
+                {t('messageTest.testUsers')}
             </h3>
             <div style={{ display: 'grid', gap: '1rem' }}>
               {testUsers.map((testUser) => (
@@ -167,7 +169,7 @@ const MessageTest = () => {
                         fontSize: '0.85rem',
                       }}
                     >
-                      {selectedUser === testUser.id ? 'Selected' : 'Select'}
+                        {selectedUser === testUser.id ? t('messageTest.selected') : t('messageTest.select')}
                     </button>
                     <button
                       onClick={() => openConversation(testUser.id)}
@@ -181,7 +183,7 @@ const MessageTest = () => {
                         fontSize: '0.85rem',
                       }}
                     >
-                      Chat
+                        {t('messageTest.chat')}
                     </button>
                   </div>
                 </div>
@@ -198,7 +200,7 @@ const MessageTest = () => {
             marginBottom: '2rem',
           }}>
             <h3 style={{ color: 'var(--text-primary)', marginBottom: '1rem' }}>
-              Send Test Message
+                {t('messageTest.sendTest')}
             </h3>
             <form onSubmit={sendMessage}>
               <div style={{ marginBottom: '1rem' }}>
@@ -208,7 +210,7 @@ const MessageTest = () => {
                   marginBottom: '0.5rem',
                   fontSize: '0.9rem' 
                 }}>
-                  Selected User:
+                    {t('messageTest.selectedUser')}:
                 </label>
                 <div style={{
                   padding: '0.75rem 1rem',
@@ -217,7 +219,7 @@ const MessageTest = () => {
                   borderRadius: '12px',
                   color: 'var(--text-primary)',
                 }}>
-                  {testUsers.find(u => u.id === selectedUser)?.name || 'No user selected'}
+                    {testUsers.find(u => u.id === selectedUser)?.name || t('messageTest.noUserSelected')}
                 </div>
               </div>
               
@@ -228,12 +230,12 @@ const MessageTest = () => {
                   marginBottom: '0.5rem',
                   fontSize: '0.9rem' 
                 }}>
-                  Message:
+                    {t('messageTest.messageLabel')}:
                 </label>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Type your test message here..."
+                    placeholder={t('messageTest.messagePlaceholder')}
                   rows={4}
                   style={{
                     width: '100%',
@@ -283,7 +285,7 @@ const MessageTest = () => {
                     animation: 'spin 1s linear infinite',
                   }} />
                 ) : (
-                  'Send Message'
+                    t('messageTest.sendMessage')
                 )}
               </button>
             </form>
@@ -316,28 +318,28 @@ const MessageTest = () => {
             padding: '1.5rem',
           }}>
             <h3 style={{ color: 'var(--text-primary)', marginBottom: '1rem' }}>
-              🧪 Test Instructions
+                🧪 {t('messageTest.instructionsTitle')}
             </h3>
             <div style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-              <p style={{ marginBottom: '0.5rem' }}><strong>1. Create Test Users:</strong></p>
+              <p style={{ marginBottom: '0.5rem' }}><strong>{t('messageTest.instructions1Title')}</strong></p>
               <ul style={{ marginLeft: '1.5rem', marginBottom: '1rem' }}>
-                <li>Sign up as: teacher@test.com / password123</li>
-                <li>Sign up as: student@test.com / password123</li>
+                  <li>{t('messageTest.instructions1a')}</li>
+                  <li>{t('messageTest.instructions1b')}</li>
               </ul>
               
-              <p style={{ marginBottom: '0.5rem' }}><strong>2. Test Messaging:</strong></p>
+              <p style={{ marginBottom: '0.5rem' }}><strong>{t('messageTest.instructions2Title')}</strong></p>
               <ul style={{ marginLeft: '1.5rem', marginBottom: '1rem' }}>
-                <li>Login as teacher</li>
-                <li>Select student user</li>
-                <li>Send test message</li>
-                <li>Check result</li>
+                  <li>{t('messageTest.instructions2a')}</li>
+                  <li>{t('messageTest.instructions2b')}</li>
+                  <li>{t('messageTest.instructions2c')}</li>
+                  <li>{t('messageTest.instructions2d')}</li>
               </ul>
               
-              <p style={{ marginBottom: '0.5rem' }}><strong>3. Verify Communication:</strong></p>
+              <p style={{ marginBottom: '0.5rem' }}><strong>{t('messageTest.instructions3Title')}</strong></p>
               <ul style={{ marginLeft: '1.5rem' }}>
-                <li>Login as student</li>
-                <li>Check if message appears in conversations</li>
-                <li>Reply to teacher</li>
+                  <li>{t('messageTest.instructions3a')}</li>
+                  <li>{t('messageTest.instructions3b')}</li>
+                  <li>{t('messageTest.instructions3c')}</li>
               </ul>
             </div>
           </div>

@@ -279,6 +279,18 @@ export class EvaluationService {
               ...contentResult.analysis,
               cefrLevel: calibratedCefr,
             };
+            const topicRelevanceForConfidence = contentResult.scores?.topicRelevance || 0;
+            const confidenceFromLength = Math.min(100, Math.max(0, wordCount * 2));
+            const confidenceFromTopic = Math.min(100, Math.max(0, topicRelevanceForConfidence));
+            const confidenceFromQuality = Math.min(100, Math.max(0, avgScore));
+            const computedConfidence = Math.round(
+              confidenceFromLength * 0.35 +
+                confidenceFromTopic * 0.35 +
+                confidenceFromQuality * 0.3,
+            );
+            evaluation.calibratedCefr = calibratedCefr;
+            evaluation.cefrConfidence = computedConfidence;
+            evaluation.calibrationVersion = 'cefr-calibration-v1';
             evaluation.detailedContentFeedback =
               contentResult.detailedFeedback;
 
@@ -388,13 +400,12 @@ export class EvaluationService {
       }
     }
 
-    // Update status using the enum
-    if (
-      performance.status === PerformanceStatus.PENDING ||
-      performance.status === PerformanceStatus.IN_PROGRESS
-    ) {
-      performance.status = PerformanceStatus.GRADED;
-    }
+    performance.feedback = {
+      ...(performance.feedback || {}),
+      aiSuggestedCefr: evaluation.calibratedCefr || evaluation.contentAnalysis?.cefrLevel,
+      aiConfidence: evaluation.cefrConfidence,
+      calibrationVersion: evaluation.calibrationVersion,
+    };
 
     performance.completedDate = new Date();
 
@@ -489,6 +500,69 @@ export class EvaluationService {
           : null,
       };
     });
+  }
+
+  async getEvaluationsForStudentPaginated(
+    studentId: string,
+    page: number,
+    limit: number,
+  ) {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safePage = Math.max(page, 1);
+    const skip = (safePage - 1) * safeLimit;
+
+    const allPerformances = await this.performanceRepo.find({
+      where: { studentId: studentId as any },
+      order: { createdAt: 'DESC' as any },
+    });
+    const total = allPerformances.length;
+    const performances = allPerformances.slice(skip, skip + safeLimit);
+
+    if (!performances.length) {
+      return { data: [], total, page: safePage, limit: safeLimit };
+    }
+
+    const performanceIds = performances.map((p) => p._id.toString());
+    const evaluations = await this.evaluationRepo.find();
+
+    const data = performances.map((performance) => {
+      const evaluation = evaluations.find(
+        (e) => e.performanceId === performance._id.toString(),
+      );
+      return {
+        performance: {
+          id: performance._id,
+          title: performance.title,
+          createdAt: performance.createdAt,
+          status: performance.status,
+          totalScore: performance.totalScore,
+          overallProficiency: performance.overallProficiency,
+          audioFile: performance.audioFile,
+        },
+        evaluation: evaluation
+          ? {
+              id: evaluation._id,
+              status: evaluation.status,
+              speechMetrics: evaluation.speechMetrics,
+              contentScores: evaluation.contentScores,
+              overallScore: evaluation.contentScores
+                ? Math.round(
+                    (
+                      (evaluation.speechMetrics?.fluency || 0) +
+                      (evaluation.speechMetrics?.pronunciation || 0) +
+                      (evaluation.contentScores?.contentStructure || 0) +
+                      (evaluation.contentScores?.grammar || 0) +
+                      (evaluation.contentScores?.vocabulary || 0)
+                    ) / 5,
+                  )
+                : null,
+              evaluatedAt: evaluation.evaluatedAt,
+            }
+          : null,
+      };
+    });
+
+    return { data, total, page: safePage, limit: safeLimit };
   }
 
   async deleteEvaluation(performanceId: string) {

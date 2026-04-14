@@ -1,5 +1,5 @@
 // backend/src/evaluation/evaluation.controller.ts
-import { Controller, Post, Get, Param, Body } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Query } from '@nestjs/common';
 import { EvaluationService } from './evaluation.service';
 
 @Controller('evaluations')
@@ -21,7 +21,20 @@ export class EvaluationController {
   }
 
   @Get('student/:studentId')
-  async getStudentEvaluations(@Param('studentId') studentId: string) {
-    return this.evaluationService.getAllEvaluationsForStudent(studentId);
+  async getStudentEvaluations(
+    @Param('studentId') studentId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (!page && !limit) {
+      return this.evaluationService.getAllEvaluationsForStudent(studentId);
+    }
+    const parsedPage = Number(page ?? 1);
+    const parsedLimit = Number(limit ?? 20);
+    return this.evaluationService.getEvaluationsForStudentPaginated(
+      studentId,
+      parsedPage,
+      parsedLimit,
+    );
   }
 }

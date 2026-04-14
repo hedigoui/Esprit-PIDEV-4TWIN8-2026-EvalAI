@@ -10,6 +10,10 @@ import {
   Conversation,
   Notification,
   Appointment,
+  Invitation,
+  Block,
+  Mute,
+  Report,
   MessageType,
   MessageStatus,
 } from './communication.models';
@@ -27,6 +31,14 @@ export class CommunicationService {
     private readonly appointmentRepository: MongoRepository<Appointment>,
     @InjectRepository(Notification)
     private readonly notificationRepository: MongoRepository<Notification>,
+    @InjectRepository(Invitation)
+    private readonly invitationRepository: MongoRepository<Invitation>,
+    @InjectRepository(Block)
+    private readonly blockRepository: MongoRepository<Block>,
+    @InjectRepository(Mute)
+    private readonly muteRepository: MongoRepository<Mute>,
+    @InjectRepository(Report)
+    private readonly reportRepository: MongoRepository<Report>,
     @InjectRepository(Users)
     private readonly userRepository: MongoRepository<Users>,
   ) {}
@@ -40,6 +52,9 @@ export class CommunicationService {
     type: MessageType = MessageType.TEXT,
   ): Promise<Message> {
     try {
+      if (await this.isBlockedBetween(senderId, receiverId)) {
+        throw new BadRequestException('Messaging is blocked between these users');
+      }
       // Find or create conversation
       let conversation = await this.findConversation(senderId, receiverId);
 
@@ -73,6 +88,189 @@ export class CommunicationService {
     }
   }
 
+  async sendFileMessage(
+    senderId: string,
+    receiverId: string,
+    payload: {
+      content?: string;
+      type?: MessageType;
+      fileName?: string;
+      fileUrl?: string;
+      fileSize?: number;
+      duration?: number;
+    },
+  ): Promise<Message> {
+    try {
+      if (await this.isBlockedBetween(senderId, receiverId)) {
+        throw new BadRequestException('Messaging is blocked between these users');
+      }
+      let conversation = await this.findConversation(senderId, receiverId);
+      if (!conversation) {
+        conversation = await this.createConversation(senderId, receiverId);
+      }
+
+      const normalizedContent =
+        payload.content ||
+        (payload.type === MessageType.VOICE_NOTE
+          ? 'Voice message'
+          : payload.fileName || 'File');
+
+      const message = this.messageRepository.create({
+        content: normalizedContent,
+        type: payload.type || MessageType.FILE,
+        status: MessageStatus.SENT,
+        senderId,
+        receiverId,
+        fileName: payload.fileName,
+        fileUrl: payload.fileUrl,
+        fileSize: payload.fileSize,
+        duration: payload.duration,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const savedMessage = await this.messageRepository.save(message);
+
+      conversation.lastMessageContent = normalizedContent;
+      conversation.lastMessageTime = new Date();
+      conversation.updatedAt = new Date();
+      await this.conversationRepository.save(conversation);
+
+      return savedMessage;
+    } catch (error) {
+      console.error('Error sending file message:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  private async getLatestMessageBetween(
+    userId1: string,
+    userId2: string,
+  ): Promise<Message | null> {
+    const [forward, backward] = await Promise.all([
+      this.messageRepository.find({
+        where: { senderId: userId1, receiverId: userId2 },
+      }),
+      this.messageRepository.find({
+        where: { senderId: userId2, receiverId: userId1 },
+      }),
+    ]);
+    const merged = [...forward, ...backward].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    return merged.length ? merged[merged.length - 1] : null;
+  }
+
+  async deleteMessage(userId: string, messageId: string): Promise<Message> {
+    try {
+      if (!ObjectId.isValid(messageId)) {
+        throw new BadRequestException('Invalid message ID');
+      }
+
+      const message = await this.messageRepository.findOneBy({
+        _id: new ObjectId(messageId),
+      });
+      if (!message) {
+        throw new NotFoundException('Message not found');
+      }
+
+      if (message.senderId !== userId) {
+        throw new BadRequestException('You can only delete your own messages');
+      }
+
+      await this.messageRepository.delete({ _id: new ObjectId(messageId) });
+
+      const conversation = await this.findConversation(
+        message.senderId,
+        message.receiverId,
+      );
+      if (conversation) {
+        const latest = await this.getLatestMessageBetween(
+          message.senderId,
+          message.receiverId,
+        );
+        conversation.lastMessageContent = latest?.content || undefined;
+        conversation.lastMessageTime = latest?.createdAt || undefined;
+        conversation.updatedAt = new Date();
+        await this.conversationRepository.save(conversation);
+      }
+
+      return message;
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      throw error;
+    }
+  }
+
+  async updateMessage(
+    userId: string,
+    messageId: string,
+    content: string,
+  ): Promise<Message> {
+    try {
+      if (!ObjectId.isValid(messageId)) {
+        throw new BadRequestException('Invalid message ID');
+      }
+      if (!content?.trim()) {
+        throw new BadRequestException('Message content is required');
+      }
+
+      const message = await this.messageRepository.findOneBy({
+        _id: new ObjectId(messageId),
+      });
+      if (!message) {
+        throw new NotFoundException('Message not found');
+      }
+      if (message.senderId !== userId) {
+        throw new BadRequestException('You can only update your own messages');
+      }
+
+      message.content = content.trim();
+      message.updatedAt = new Date();
+      const updated = await this.messageRepository.save(message);
+
+      const conversation = await this.findConversation(
+        message.senderId,
+        message.receiverId,
+      );
+      if (conversation) {
+        const latest = await this.getLatestMessageBetween(
+          message.senderId,
+          message.receiverId,
+        );
+        conversation.lastMessageContent = latest?.content || undefined;
+        conversation.lastMessageTime = latest?.createdAt || undefined;
+        conversation.updatedAt = new Date();
+        await this.conversationRepository.save(conversation);
+      }
+
+      return updated;
+    } catch (error) {
+      console.error('Error updating message:', error);
+      throw error;
+    }
+  }
+
+  async createMessageNotification(
+    senderId: string,
+    receiverId: string,
+    messageId: string,
+    content: string,
+  ): Promise<Notification | null> {
+    if (await this.isMuted(receiverId, senderId)) return null;
+    const sender = await this.getUserById(senderId);
+    const title = 'New message';
+    const fromLabel = sender?.name || 'Someone';
+    const text = `${fromLabel}: ${content}`;
+    return this.createNotification(
+      receiverId,
+      title,
+      text,
+      messageId,
+      'message',
+    );
+  }
+
   async getConversationMessages(
     userId1: string,
     userId2: string,
@@ -100,6 +298,15 @@ export class CommunicationService {
 
   async getUserConversations(userId: string): Promise<any[]> {
     try {
+      const [blocksByUser, blocksOfUser, mutesByUser] = await Promise.all([
+        this.blockRepository.find({ where: { blockerId: userId } }),
+        this.blockRepository.find({ where: { blockedId: userId } }),
+        this.muteRepository.find({ where: { userId } }),
+      ]);
+      const blockedIds = new Set(blocksByUser.map((b) => b.blockedId));
+      const blockedByIds = new Set(blocksOfUser.map((b) => b.blockerId));
+      const mutedIds = new Set(mutesByUser.map((m) => m.mutedUserId));
+
       const allActive = await this.conversationRepository.find({
         where: { isActive: true },
       });
@@ -137,6 +344,7 @@ export class CommunicationService {
                   email: otherUser.email,
                   role: otherUser.role,
                   avatar: otherUser.avatar,
+                  gender: otherUser.gender,
                   name:
                     `${otherUser.firstName} ${otherUser.lastName}`.trim() ||
                     otherUser.email,
@@ -154,6 +362,9 @@ export class CommunicationService {
               name: 'Unknown User',
               role: 'user',
             },
+            isBlocked: otherParticipantId ? blockedIds.has(otherParticipantId) : false,
+            isBlockedByOther: otherParticipantId ? blockedByIds.has(otherParticipantId) : false,
+            isMuted: otherParticipantId ? mutedIds.has(otherParticipantId) : false,
           };
         }),
       );
@@ -201,6 +412,107 @@ export class CommunicationService {
     return await this.conversationRepository.save(conversation);
   }
 
+  private async isBlockedBetween(userId1: string, userId2: string): Promise<boolean> {
+    const [block1, block2] = await Promise.all([
+      this.blockRepository.findOne({ where: { blockerId: userId1, blockedId: userId2 } }),
+      this.blockRepository.findOne({ where: { blockerId: userId2, blockedId: userId1 } }),
+    ]);
+    return Boolean(block1 || block2);
+  }
+
+  private async isMuted(userId: string, mutedUserId: string): Promise<boolean> {
+    const mute = await this.muteRepository.findOne({ where: { userId, mutedUserId } });
+    return Boolean(mute);
+  }
+
+  async deleteConversation(userId: string, otherUserId: string): Promise<void> {
+    const conversations = await this.conversationRepository.find();
+    const conversation = conversations.find(
+      (conv) =>
+        Array.isArray(conv.participantIds) &&
+        conv.participantIds.includes(userId) &&
+        conv.participantIds.includes(otherUserId),
+    );
+
+    await this.messageRepository.deleteMany({
+      $or: [
+        { senderId: userId, receiverId: otherUserId },
+        { senderId: otherUserId, receiverId: userId },
+      ],
+    });
+
+    if (conversation?._id) {
+      await this.conversationRepository.delete({ _id: conversation._id });
+    }
+  }
+
+  async getBlocks(userId: string): Promise<Block[]> {
+    return this.blockRepository.find({ where: { blockerId: userId } });
+  }
+
+  async blockUser(userId: string, blockedId: string): Promise<Block> {
+    if (userId === blockedId) {
+      throw new BadRequestException('You cannot block yourself');
+    }
+    const existing = await this.blockRepository.findOne({
+      where: { blockerId: userId, blockedId },
+    });
+    if (existing) return existing;
+    const block = this.blockRepository.create({
+      blockerId: userId,
+      blockedId,
+      createdAt: new Date(),
+    });
+    return this.blockRepository.save(block);
+  }
+
+  async unblockUser(userId: string, blockedId: string): Promise<void> {
+    await this.blockRepository.deleteMany({ blockerId: userId, blockedId });
+  }
+
+  async getMutes(userId: string): Promise<Mute[]> {
+    return this.muteRepository.find({ where: { userId } });
+  }
+
+  async muteUser(userId: string, mutedUserId: string): Promise<Mute> {
+    if (userId === mutedUserId) {
+      throw new BadRequestException('You cannot mute yourself');
+    }
+    const existing = await this.muteRepository.findOne({
+      where: { userId, mutedUserId },
+    });
+    if (existing) return existing;
+    const mute = this.muteRepository.create({
+      userId,
+      mutedUserId,
+      createdAt: new Date(),
+    });
+    return this.muteRepository.save(mute);
+  }
+
+  async unmuteUser(userId: string, mutedUserId: string): Promise<void> {
+    await this.muteRepository.deleteMany({ userId, mutedUserId });
+  }
+
+  async createReport(
+    reporterId: string,
+    reportedId: string,
+    reason?: string,
+    messageId?: string,
+  ): Promise<Report> {
+    if (reporterId === reportedId) {
+      throw new BadRequestException('You cannot report yourself');
+    }
+    const report = this.reportRepository.create({
+      reporterId,
+      reportedId,
+      reason,
+      messageId,
+      createdAt: new Date(),
+    });
+    return this.reportRepository.save(report);
+  }
+
   // ===== USER HELPER METHODS =====
 
   async getUserById(userId: string): Promise<any | null> {
@@ -217,12 +529,33 @@ export class CommunicationService {
           email: user.email,
           role: user.role,
           avatar: user.avatar,
+          gender: user.gender,
           name: `${user.firstName} ${user.lastName}`.trim() || user.email,
         };
       }
       return null;
     } catch (error) {
       console.error('❌ Error fetching user:', error);
+      return null;
+    }
+  }
+
+  async getUserByEmail(email: string): Promise<any | null> {
+    try {
+      const user = await this.userRepository.findOne({ where: { email } });
+      if (!user) return null;
+      return {
+        id: user._id?.toString?.() || user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        gender: user.gender,
+        name: `${user.firstName} ${user.lastName}`.trim() || user.email,
+      };
+    } catch (error) {
+      console.error('❌ Error fetching user by email:', error);
       return null;
     }
   }
@@ -273,7 +606,7 @@ export class CommunicationService {
     title: string,
     message: string,
     relatedEntityId?: string,
-    relatedEntityType?: 'message' | 'appointment' | 'feedback' | 'announcement',
+    relatedEntityType?: 'message' | 'appointment' | 'feedback' | 'announcement' | 'invitation',
   ): Promise<Notification | null> {
     try {
       const notification = {
@@ -292,6 +625,172 @@ export class CommunicationService {
       console.error('❌ Error creating notification:', error);
       return null;
     }
+  }
+
+  // ===== INVITATION SYSTEM =====
+
+  async createInvitation(teacherId: string, studentId: string) {
+    const existing = await this.invitationRepository.findOne({
+      where: { teacherId, studentId, status: 'pending' },
+    });
+    if (existing) return existing;
+
+    const invitation = this.invitationRepository.create({
+      teacherId,
+      studentId,
+      status: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const saved = await this.invitationRepository.save(invitation);
+    await this.createNotification(
+      studentId,
+      'New instructor invitation',
+      'An instructor invited you to join their students group.',
+      saved._id.toString(),
+      'invitation',
+    );
+    return saved;
+  }
+
+  async getInvitationsForStudent(studentId: string) {
+    const invites = await this.invitationRepository.find({
+      where: { studentId },
+      order: { createdAt: -1 },
+    });
+    const teacherIds = invites.map((i) => i.teacherId).filter(Boolean);
+    const teachers = await Promise.all(
+      teacherIds.map((id) => this.getUserById(id)),
+    );
+    const teacherMap = new Map(
+      teachers.filter(Boolean).map((t) => [t.id, t]),
+    );
+    return invites.map((i) => ({
+      ...i,
+      teacher: teacherMap.get(i.teacherId) || null,
+    }));
+  }
+
+  async getInvitationsForTeacher(teacherId: string) {
+    const invites = await this.invitationRepository.find({
+      where: { teacherId },
+      order: { createdAt: -1 },
+    });
+    const studentIds = invites.map((i) => i.studentId).filter(Boolean);
+    const students = await Promise.all(
+      studentIds.map((id) => this.getUserById(id)),
+    );
+    const studentMap = new Map(
+      students.filter(Boolean).map((s) => [s.id, s]),
+    );
+    return invites.map((i) => ({
+      ...i,
+      student: studentMap.get(i.studentId) || null,
+    }));
+  }
+
+  async acceptInvitation(invitationId: string, studentId: string) {
+    const invitation = await this.invitationRepository.findOneBy({
+      _id: new ObjectId(invitationId),
+    });
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+    if (invitation.studentId !== studentId) {
+      throw new BadRequestException('Unauthorized to accept this invitation');
+    }
+    invitation.status = 'accepted';
+    invitation.updatedAt = new Date();
+    const updated = await this.invitationRepository.save(invitation);
+
+    await this.createNotification(
+      invitation.teacherId,
+      'Invitation accepted',
+      'A student accepted your invitation.',
+      invitation._id.toString(),
+      'invitation',
+    );
+    return updated;
+  }
+
+  async rejectInvitation(invitationId: string, studentId: string) {
+    const invitation = await this.invitationRepository.findOneBy({
+      _id: new ObjectId(invitationId),
+    });
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+    if (invitation.studentId !== studentId) {
+      throw new BadRequestException('Unauthorized to reject this invitation');
+    }
+    invitation.status = 'rejected';
+    invitation.updatedAt = new Date();
+    const updated = await this.invitationRepository.save(invitation);
+
+    await this.createNotification(
+      invitation.teacherId,
+      'Invitation declined',
+      'A student declined your invitation.',
+      invitation._id.toString(),
+      'invitation',
+    );
+    return updated;
+  }
+
+  async getAssignedStudents(teacherId: string) {
+    const invitations = await this.invitationRepository.find({
+      where: { teacherId, status: 'accepted' },
+    });
+    const ids = invitations.map((i) => i.studentId).filter(Boolean);
+    if (!ids.length) return [];
+    const objectIds = ids
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+    if (!objectIds.length) return [];
+
+    return this.userRepository.find({
+      where: { _id: { $in: objectIds } },
+    });
+  }
+
+  async getAssignedStudentsPaginated(
+    teacherId: string,
+    page: number,
+    limit: number,
+  ) {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safePage = Math.max(page, 1);
+    const skip = (safePage - 1) * safeLimit;
+
+    const [invitations, total] = await Promise.all([
+      this.invitationRepository.find({
+        where: { teacherId, status: 'accepted' },
+        order: { createdAt: 'DESC' },
+        skip,
+        take: safeLimit,
+      }),
+      this.invitationRepository.count({
+        where: { teacherId, status: 'accepted' },
+      }),
+    ]);
+
+    const ids = invitations.map((i) => i.studentId).filter(Boolean);
+    const objectIds = ids
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+    const students = objectIds.length
+      ? await this.userRepository.find({ where: { _id: { $in: objectIds } } })
+      : [];
+
+    const studentMap = new Map(
+      students.map((s) => [s._id?.toString?.() || s._id, s]),
+    );
+    const ordered = ids
+      .map((id) => studentMap.get(id))
+      .filter(Boolean);
+
+    return { data: ordered, total, page: safePage, limit: safeLimit };
   }
 
   // ===== APPOINTMENT SYSTEM =====

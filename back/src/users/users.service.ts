@@ -242,9 +242,11 @@ export class UsersService {
     userId: string,
     firstName: string,
     lastName: string,
+    gender?: 'male' | 'female',
   ): string {
-    const seed = `${userId}-${firstName}-${lastName}`;
-    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
+    const sex = gender === 'female' ? 'female' : 'male';
+    const seed = `${sex}-${userId}-${firstName}-${lastName}`;
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}&backgroundColor=b6e3f4,c0aede,d1d4f9&sex=${sex}`;
   }
 
   async create(data: {
@@ -252,6 +254,7 @@ export class UsersService {
     password: string;
     firstName: string;
     lastName: string;
+    gender?: 'male' | 'female';
     role: UserRole;
     isActive: boolean;
   }): Promise<Users> {
@@ -272,6 +275,7 @@ export class UsersService {
         password: hashedPassword,
         firstName: data.firstName,
         lastName: data.lastName,
+        gender: data.gender,
         role: data.role,
         isActive: data.isActive ?? false,
         createdAt: new Date(),
@@ -285,6 +289,7 @@ export class UsersService {
         savedUser._id.toString(),
         data.firstName,
         data.lastName,
+        data.gender,
       );
 
       // Update user with avatar
@@ -311,6 +316,23 @@ export class UsersService {
 
   async findAll(): Promise<Users[]> {
     return this.userRepository.find();
+  }
+
+  async findAllPaginated(page: number, limit: number) {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safePage = Math.max(page, 1);
+    const skip = (safePage - 1) * safeLimit;
+
+    const [data, total] = await Promise.all([
+      this.userRepository.find({
+        order: { createdAt: 'DESC' },
+        skip,
+        take: safeLimit,
+      }),
+      this.userRepository.count(),
+    ]);
+
+    return { data, total, page: safePage, limit: safeLimit };
   }
 
   async findOne(id: string): Promise<Users> {
@@ -422,9 +444,33 @@ export class UsersService {
         students.map((s) => ({ id: s._id, email: s.email, role: s.role })),
       );
 
-      return students;
+      return students.map((s) => {
+        const { password: _password, ...rest } = s as Users & { password?: string };
+        return rest as Users;
+      });
     } catch (error) {
       console.error('❌ Error fetching students:', error);
+      throw error;
+    }
+  }
+
+  async getInstructors(): Promise<Users[]> {
+    try {
+      console.log('🔍 Fetching all instructors from database');
+      console.log('🔍 Looking for role:', UserRole.INSTRUCTOR);
+
+      const instructors = await this.userRepository.find({
+        where: { role: UserRole.INSTRUCTOR },
+        order: { createdAt: 'DESC' },
+      });
+
+      console.log(`✅ Found ${instructors.length} instructors`);
+      return instructors.map((i) => {
+        const { password: _password, ...rest } = i as Users & { password?: string };
+        return rest as Users;
+      });
+    } catch (error) {
+      console.error('❌ Error fetching instructors:', error);
       throw error;
     }
   }
@@ -439,6 +485,10 @@ export class UsersService {
       email: string;
       firstName: string;
       lastName: string;
+      avatar?: string;
+      gender?: 'male' | 'female';
+      phone?: string;
+      bio?: string;
       role: UserRole;
       isActive: boolean;
       isTemporaryPassword: boolean;
@@ -481,6 +531,10 @@ export class UsersService {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          avatar: user.avatar,
+          gender: user.gender,
+          phone: user.phone,
+          bio: user.bio,
           role: user.role,
           isActive: user.isActive,
           isTemporaryPassword: user.isTemporaryPassword || false,
@@ -743,6 +797,7 @@ export class UsersService {
       firstName?: string;
       lastName?: string;
       email?: string;
+      gender?: 'male' | 'female';
       phone?: string;
       bio?: string;
       avatar?: string;

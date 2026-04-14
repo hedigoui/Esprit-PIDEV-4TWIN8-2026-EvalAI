@@ -12,6 +12,7 @@ import {
   Res,
   HttpStatus,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { OralPerformanceService } from './oral-performance.service';
@@ -52,7 +53,19 @@ export class OralPerformanceController {
   }
 
   @Get()
-  async findAll() {
+  async findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (page || limit) {
+      const parsedPage = Number(page ?? 1);
+      const parsedLimit = Number(limit ?? 20);
+      const result = await this.oralPerformanceService.findAllPaginated(
+        parsedPage,
+        parsedLimit,
+      );
+      return { statusCode: HttpStatus.OK, ...result };
+    }
     const performances = await this.oralPerformanceService.findAll();
     return {
       statusCode: HttpStatus.OK,
@@ -61,9 +74,22 @@ export class OralPerformanceController {
   }
 
   @Get('student/:studentId')
-  async findByStudent(@Param('studentId') studentId: string) {
-    const performances =
-      await this.oralPerformanceService.findByStudent(studentId);
+  async findByStudent(
+    @Param('studentId') studentId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (page || limit) {
+      const parsedPage = Number(page ?? 1);
+      const parsedLimit = Number(limit ?? 20);
+      const result = await this.oralPerformanceService.findByStudentPaginated(
+        studentId,
+        parsedPage,
+        parsedLimit,
+      );
+      return { statusCode: HttpStatus.OK, ...result };
+    }
+    const performances = await this.oralPerformanceService.findByStudent(studentId);
     return {
       statusCode: HttpStatus.OK,
       data: performances,
@@ -71,9 +97,22 @@ export class OralPerformanceController {
   }
 
   @Get('instructor/:instructorId')
-  async findByInstructor(@Param('instructorId') instructorId: string) {
-    const performances =
-      await this.oralPerformanceService.findByInstructor(instructorId);
+  async findByInstructor(
+    @Param('instructorId') instructorId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (page || limit) {
+      const parsedPage = Number(page ?? 1);
+      const parsedLimit = Number(limit ?? 20);
+      const result = await this.oralPerformanceService.findByInstructorPaginated(
+        instructorId,
+        parsedPage,
+        parsedLimit,
+      );
+      return { statusCode: HttpStatus.OK, ...result };
+    }
+    const performances = await this.oralPerformanceService.findByInstructor(instructorId);
     return {
       statusCode: HttpStatus.OK,
       data: performances,
@@ -93,6 +132,52 @@ export class OralPerformanceController {
       statusCode: HttpStatus.OK,
       data: statistics,
     };
+  }
+
+  @Post('roster/upload/:instructorId')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadRoster(
+    @Param('instructorId') instructorId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No roster file uploaded');
+    }
+    const roster = await this.oralPerformanceService.uploadInstructorRoster(
+      instructorId,
+      file,
+    );
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Roster uploaded successfully',
+      data: roster,
+    };
+  }
+
+  @Get('roster/:instructorId')
+  async getRoster(@Param('instructorId') instructorId: string) {
+    const roster = await this.oralPerformanceService.getInstructorRoster(
+      instructorId,
+    );
+    return {
+      statusCode: HttpStatus.OK,
+      data: roster,
+    };
+  }
+
+  @Get('roster/:instructorId/export')
+  async exportRoster(
+    @Param('instructorId') instructorId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } =
+      await this.oralPerformanceService.exportInstructorRoster(instructorId);
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+    return res.send(buffer);
   }
 
   @Get(':id')

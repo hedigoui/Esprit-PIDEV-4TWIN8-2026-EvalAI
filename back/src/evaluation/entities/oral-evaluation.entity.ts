@@ -68,6 +68,15 @@ export class OralEvaluation {
     vocabularySuggestions: string[];
   };
 
+  @Column({ nullable: true })
+  calibratedCefr?: string;
+
+  @Column({ nullable: true })
+  cefrConfidence?: number;
+
+  @Column({ default: 'cefr-calibration-v1' })
+  calibrationVersion?: string;
+
   @Column('simple-json', { nullable: true })
   assemblyAIRaw?: any;
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Mic, ArrowLeft } from 'lucide-react';
 import styles from './Login.module.css';
+import { useI18n } from '../i18n/I18nProvider';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ const ForgotPassword = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const { t } = useI18n();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,11 +33,11 @@ const ForgotPassword = () => {
       if (response.ok) {
         setSuccess(true);
       } else {
-        setError(data.message || 'Failed to send reset email. Please try again.');
+        setError(data.message || t('auth.forgotFailed'));
       }
     } catch (error) {
       console.error('Forgot password error:', error);
-      setError('Cannot connect to server. Please check if backend is running on port 3000');
+      setError(t('auth.cannotConnect'));
     } finally {
       setLoading(false);
     }
@@ -69,9 +71,9 @@ const ForgotPassword = () => {
           </div>
 
           <div className={styles.welcomeText}>
-            <h1>Reset Your<br />Password</h1>
+            <h1>{t('auth.forgotLeftLine1')}<br />{t('auth.forgotLeftLine2')}</h1>
             <p className={styles.welcomeSubtext}>
-              Enter your email to receive a new temporary password
+              {t('auth.forgotSubIdle')}
             </p>
           </div>
 
@@ -79,21 +81,21 @@ const ForgotPassword = () => {
             <div className={styles.featureList}>
               <div className={styles.featureItem}>
                 <div className={styles.featureDot} />
-                <span>New password sent to your email</span>
+                <span>{t('auth.forgotFeature1')}</span>
               </div>
               <div className={styles.featureItem}>
                 <div className={styles.featureDot} />
-                <span>Sign in with the new password</span>
+                <span>{t('auth.forgotFeature2')}</span>
               </div>
               <div className={styles.featureItem}>
                 <div className={styles.featureDot} />
-                <span>Change it in Settings for security</span>
+                <span>{t('auth.forgotFeature3')}</span>
               </div>
             </div>
           </div>
 
           <p className={styles.tagline}>
-            We'll send you a new temporary password via email.
+            {t('auth.forgotTagline')}
           </p>
         </div>
 
@@ -106,11 +108,11 @@ const ForgotPassword = () => {
       <div className={`${styles.rightPanel} ${isTransitioning ? styles.fadeOut : styles.fadeIn}`}>
         <div className={styles.formWrapper}>
           <div className={styles.formHeader}>
-            <h2 className={styles.title}>Forgot Password?</h2>
+            <h2 className={styles.title}>{t('auth.forgotTitle')}</h2>
             <p className={styles.subtitle}>
               {success 
-                ? 'Check your email for your new password' 
-                : 'Enter your email address and we\'ll send you a new temporary password'}
+                ? t('auth.forgotSubSuccess') 
+                : t('auth.forgotSubIdle')}
             </p>
           </div>
 
@@ -131,19 +133,18 @@ const ForgotPassword = () => {
               fontSize: '0.9rem',
               lineHeight: '1.6'
             }}>
-              <strong>✓ New password sent!</strong><br />
-              If an account with that email exists, we've sent you a new temporary password. 
-              Please check your inbox, sign in with the new password, and then change it in your Settings for security.
+              <strong>{t('auth.forgotSuccessTitle')}</strong><br />
+              {t('auth.forgotSuccessBody')}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className={styles.form}>
               <div className={styles.inputGroup}>
-                <label className={styles.label} htmlFor="email">Email</label>
+                <label className={styles.label} htmlFor="email">{t('auth.email')}</label>
                 <div className={styles.inputWrapper}>
                   <input
                     id="email"
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder={t('auth.emailPlaceholder')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className={styles.input}
@@ -159,13 +160,13 @@ const ForgotPassword = () => {
                 className={styles.loginButton}
                 disabled={loading}
               >
-                {loading ? 'Sending...' : 'Send Reset Link'}
+                {loading ? t('auth.sending') : t('auth.sendReset')}
               </button>
             </form>
           )}
 
           <p className={styles.signupLink}>
-            Remember your password? <a href="#" onClick={handleNavigateToLogin}>Back to Sign In</a>
+            {t('auth.rememberPassword')} <a href="#" onClick={handleNavigateToLogin}>{t('auth.backToSignIn')}</a>
           </p>
         </div>
 

@@ -87,6 +87,24 @@ export interface PerformanceRecord {
   };
 }
 
+export interface InstructorRosterRow {
+  rowNumber: number;
+  firstName?: string;
+  lastName?: string;
+  studentId?: string;
+  email?: string;
+  cefrLevel?: string;
+}
+
+export interface InstructorRosterRecord {
+  _id: string;
+  instructorId: string;
+  originalFilename?: string;
+  rows: InstructorRosterRow[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // ===========================================
 // SERVICE IMPLEMENTATION
 // ===========================================
@@ -164,6 +182,26 @@ export const oralPerformanceService = {
     return result.data || [];
   },
 
+  async getInstructorPerformancesPage(instructorId: string, page: number, limit: number) {
+    const response = await fetch(
+      `${API_URL}/oral-performances/instructor/${instructorId}?page=${page}&limit=${limit}`,
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to get instructor performances: ${response.statusText}`);
+    }
+    const result = await response.json();
+    return result;
+  },
+
+  async getAllPerformancesPage(page: number, limit: number) {
+    const response = await fetch(`${API_URL}/oral-performances?page=${page}&limit=${limit}`);
+    if (!response.ok) {
+      throw new Error(`Failed to get performances: ${response.statusText}`);
+    }
+    const result = await response.json();
+    return result;
+  },
+
   async getStatistics(instructorId: string) {
     const response = await fetch(`${API_URL}/oral-performances/statistics?instructorId=${encodeURIComponent(instructorId)}`);
     if (!response.ok) {
@@ -215,6 +253,20 @@ export const oralPerformanceService = {
     });
     if (!response.ok) {
       throw new Error(await readFetchError(response, `Failed to update feedback: ${response.statusText}`));
+    }
+    const result = await response.json();
+    return result.data || result;
+  },
+
+  // Update status for a performance
+  async updateStatus(id: string, status: string) {
+    const response = await fetch(`${API_URL}/oral-performances/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (!response.ok) {
+      throw new Error(await readFetchError(response, `Failed to update status: ${response.statusText}`));
     }
     const result = await response.json();
     return result.data || result;
@@ -283,5 +335,43 @@ export const oralPerformanceService = {
     if (Array.isArray(raw)) return raw;
     if (raw && Array.isArray(raw.data)) return raw.data;
     return [];
+  },
+
+  async getAllStudentEvaluationsPage(studentId: string, page: number, limit: number) {
+    const response = await fetch(
+      `${API_URL}/evaluations/student/${studentId}?page=${page}&limit=${limit}`,
+    );
+    if (!response.ok) {
+      throw new Error(await readFetchError(response, `Failed to get student evaluations: ${response.statusText}`));
+    }
+    return response.json();
+  },
+
+  async uploadInstructorRoster(instructorId: string, file: File): Promise<InstructorRosterRecord> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${API_URL}/oral-performances/roster/upload/${instructorId}`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      throw new Error(await readFetchError(response, `Failed to upload roster: ${response.statusText}`));
+    }
+    const result = await response.json();
+    return result.data || result;
+  },
+
+  async getInstructorRoster(instructorId: string): Promise<InstructorRosterRecord | null> {
+    const response = await fetch(`${API_URL}/oral-performances/roster/${instructorId}`);
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(await readFetchError(response, `Failed to get roster: ${response.statusText}`));
+    }
+    const result = await response.json();
+    return result.data || result;
+  },
+
+  getInstructorRosterExportUrl(instructorId: string): string {
+    return `${API_URL}/oral-performances/roster/${instructorId}/export`;
   }
 };

@@ -2,17 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import StudentSidebar from '../../components/StudentSidebar';
+import TopNavbar from '../../components/TopNavbar';
 import styles from '../../styles/shared.module.css';
 import { LifeBuoy, Send, RefreshCw, Tag, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { useI18n } from '../../i18n/I18nProvider';
 
 const API_URL = 'http://localhost:3000';
-
-const statusMeta = {
-  open: { label: 'Open', tone: 'warning' },
-  in_progress: { label: 'In progress', tone: 'info' },
-  resolved: { label: 'Resolved', tone: 'success' },
-  rejected: { label: 'Rejected', tone: 'red' },
-};
 
 function formatDate(value) {
   const d = value ? new Date(value) : null;
@@ -31,6 +26,14 @@ const Reclamations = () => {
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const { t } = useI18n();
+
+  const statusMeta = {
+    open: { label: t('reclamations.statusOpen'), tone: 'warning' },
+    in_progress: { label: t('reclamations.statusInProgress'), tone: 'info' },
+    resolved: { label: t('reclamations.statusResolved'), tone: 'success' },
+    rejected: { label: t('reclamations.statusRejected'), tone: 'red' },
+  };
 
   const token = useMemo(() => localStorage.getItem('token'), []);
 
@@ -68,7 +71,7 @@ const Reclamations = () => {
       setItems(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       console.error(e);
-      setError('Failed to load your reclamations.');
+      setError(t('reclamations.studentFailedLoad'));
       if (e?.response?.status === 401) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -91,7 +94,7 @@ const Reclamations = () => {
     const t = title.trim();
     const d = description.trim();
     if (!t || !d) {
-      setError('Please fill title and description.');
+      setError(t('reclamations.studentFillTitleDesc'));
       return;
     }
 
@@ -122,7 +125,7 @@ const Reclamations = () => {
       await fetchMine();
     } catch (e) {
       console.error(e);
-      setError(e?.response?.data?.message || 'Failed to submit reclamation.');
+      setError(e?.response?.data?.message || t('reclamations.studentFailedSubmit'));
     } finally {
       setSubmitting(false);
     }
@@ -132,19 +135,20 @@ const Reclamations = () => {
     <div className={styles.layout}>
       <StudentSidebar />
       <div className={styles.mainContent}>
+        <TopNavbar />
         <main className={styles.content}>
           <div className={styles.pageHeader}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <LifeBuoy size={18} style={{ color: '#E31837' }} />
-                <div className={styles.pageTitle}>Reclamations</div>
+                <div className={styles.pageTitle}>{t('reclamations.title')}</div>
               </div>
               <div className={styles.pageSubtitle}>
-                Submit an issue (account, evaluation, bug) and track responses.
+                {t('reclamations.studentSubtitle')}
               </div>
             </div>
             <button className={styles.secondaryButton} onClick={fetchMine} disabled={loading}>
-              <RefreshCw size={16} /> Refresh
+              <RefreshCw size={16} /> {t('reclamations.refresh')}
             </button>
           </div>
 
@@ -160,18 +164,18 @@ const Reclamations = () => {
           <div className={styles.grid2} style={{ alignItems: 'start' }}>
             <div className={styles.card}>
               <div className={styles.cardTitle} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Send size={16} style={{ color: '#E31837' }} /> New reclamation
+                <Send size={16} style={{ color: '#E31837' }} /> {t('reclamations.studentNew')}
               </div>
 
               <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '0.9rem' }}>
                 <div>
                   <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', marginBottom: '0.35rem' }}>
-                    Title
+                    {t('reclamations.titleLabel')}
                   </div>
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Short summary (e.g. “My evaluation score looks wrong”)"
+                    placeholder={t('reclamations.studentTitlePlaceholder')}
                     style={{
                       width: '100%',
                       padding: '0.75rem 0.85rem',
@@ -186,7 +190,7 @@ const Reclamations = () => {
 
                 <div>
                   <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', marginBottom: '0.35rem' }}>
-                    Category
+                    {t('reclamations.category')}
                   </div>
                   <div style={{ position: 'relative' }}>
                     <Tag
@@ -213,22 +217,22 @@ const Reclamations = () => {
                       }}
                       disabled={submitting}
                     >
-                      <option value="evaluation">Evaluation</option>
-                      <option value="account">Account</option>
-                      <option value="bug">Bug</option>
-                      <option value="other">Other</option>
+                      <option value="evaluation">{t('reclamations.categoryEvaluation')}</option>
+                      <option value="account">{t('reclamations.categoryAccount')}</option>
+                      <option value="bug">{t('reclamations.categoryBug')}</option>
+                      <option value="other">{t('reclamations.categoryOther')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
                   <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', marginBottom: '0.35rem' }}>
-                    Description
+                    {t('reclamations.description')}
                   </div>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe your problem with as much detail as possible…"
+                    placeholder={t('reclamations.descriptionPlaceholder')}
                     rows={6}
                     style={{
                       width: '100%',
@@ -244,19 +248,19 @@ const Reclamations = () => {
                 </div>
 
                 <button className={styles.primaryButton} type="submit" disabled={submitting}>
-                  <Send size={16} /> {submitting ? 'Sending…' : 'Submit'}
+                  <Send size={16} /> {submitting ? t('reclamations.sending') : t('reclamations.submit')}
                 </button>
               </form>
             </div>
 
             <div className={styles.card}>
-              <div className={styles.cardTitle}>My reclamations</div>
+              <div className={styles.cardTitle}>{t('reclamations.myReclamations')}</div>
 
               {loading ? (
-                <div style={{ color: '#64748b', fontSize: '0.9rem' }}>Loading…</div>
+                <div style={{ color: '#64748b', fontSize: '0.9rem' }}>{t('reclamations.loading')}</div>
               ) : items.length === 0 ? (
                 <div style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                  You haven’t submitted any reclamation yet.
+                  {t('reclamations.studentEmpty')}
                 </div>
               ) : (
                 <div style={{ display: 'grid', gap: '0.75rem' }}>
@@ -296,13 +300,13 @@ const Reclamations = () => {
                               {r.title}
                             </div>
                             <div style={{ color: '#94a3b8', fontSize: '0.78rem', marginTop: '0.15rem' }}>
-                              {r.category ? `Category: ${r.category}` : 'Category: —'} • {formatDate(r.createdAt)}
+                              {r.category ? `${t('reclamations.categoryLabel')}: ${r.category}` : `${t('reclamations.categoryLabel')}: —`} • {formatDate(r.createdAt)}
                             </div>
                           </div>
                           <span className={`${styles.badge} ${styles[meta.tone] || ''}`} style={{ flexShrink: 0 }}>{meta.label}</span>
                           <span style={{ flexShrink: 0, color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem' }}>
                             {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                            {isExpanded ? 'Close' : 'Read'}
+                            {isExpanded ? t('reclamations.close') : t('reclamations.read')}
                           </span>
                         </button>
 
@@ -310,7 +314,7 @@ const Reclamations = () => {
                           <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                             <div style={{ marginBottom: '0.85rem' }}>
                               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                <FileText size={14} /> Your message
+                                <FileText size={14} /> {t('reclamations.yourMessage')}
                               </div>
                               <div
                                 style={{
@@ -344,13 +348,13 @@ const Reclamations = () => {
                                 }}
                               >
                                 <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#3b82f6', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                  Response from support
+                                  {t('reclamations.supportResponse')}
                                 </div>
                                 {r.responseMessage}
                               </div>
                             ) : (
                               <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                No response yet.
+                                {t('reclamations.noResponse')}
                               </div>
                             )}
                           </div>

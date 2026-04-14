@@ -78,6 +78,15 @@ class Feedback {
 
   @Column()
   cefrLevel?: string;
+
+  @Column()
+  aiSuggestedCefr?: string;
+
+  @Column()
+  aiConfidence?: number;
+
+  @Column()
+  calibrationVersion?: string;
 }
 
 class Metadata {
@@ -152,6 +161,27 @@ export class OralPerformance {
 
   @Column()
   completedDate?: Date;
+
+  @Column()
+  resultEmailSentAt?: Date;
+
+  @Column()
+  resultEmailMessageId?: string;
+
+  @Column()
+  reopenedAt?: Date;
+
+  @Column()
+  reopenedById?: string;
+
+  @Column()
+  reopenedByRole?: string;
+
+  @Column()
+  reopenReason?: string;
+
+  @Column()
+  appealCount?: number;
 
   @Column(() => Metadata)
   metadata?: Metadata;

@@ -19,6 +19,10 @@ import {
   Conversation,
   Appointment,
   Notification,
+  Invitation,
+  Block,
+  Mute,
+  Report,
 } from './communication/communication.models';
 
 @Module({
@@ -37,6 +41,10 @@ import {
         Conversation,
         Appointment,
         Notification,
+        Invitation,
+        Block,
+        Mute,
+        Report,
         Reclamation,
         OralPerformance,
         OralEvaluation,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import styles from './Login.module.css';
+import { useI18n } from '../i18n/I18nProvider';
 
 function parseUser(raw) {
   if (!raw) return null;
@@ -21,7 +22,8 @@ function parseUser(raw) {
 export default function AuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [message, setMessage] = useState('Completing sign-in…');
+  const { t } = useI18n();
+  const [message, setMessage] = useState(t('authCallback.completing'));
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -29,7 +31,7 @@ export default function AuthCallback() {
     const err = searchParams.get('error');
 
     if (err) {
-      setMessage('Redirecting…');
+      setMessage(t('authCallback.redirecting'));
       navigate(`/?error=${encodeURIComponent(err)}`, { replace: true });
       return;
     }
@@ -63,7 +65,7 @@ export default function AuthCallback() {
     } else {
       navigate('/?error=oauth_role', { replace: true });
     }
-  }, [navigate, searchParams]);
+  }, [navigate, searchParams, t]);
 
   return (
     <div className={styles.container}>

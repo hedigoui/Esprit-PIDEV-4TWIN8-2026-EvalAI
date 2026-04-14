@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mic, CheckCircle } from 'lucide-react';
 import styles from './Login.module.css';
+import { useI18n } from '../i18n/I18nProvider';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const ResetPassword = () => {
   const [success, setSuccess] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [token, setToken] = useState('');
+  const { t } = useI18n();
 
   useEffect(() => {
     const tokenParam = searchParams.get('token');
@@ -24,7 +26,7 @@ const ResetPassword = () => {
     
     if (!tokenParam) {
       console.error('❌ No token found in URL');
-      setError('Invalid reset link. The token is missing. Please request a new password reset.');
+      setError(t('auth.invalidLink'));
     } else {
       console.log('✅ Token found, setting token state');
       setToken(tokenParam);
@@ -36,17 +38,17 @@ const ResetPassword = () => {
     setError('');
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match!');
+      setError(t('auth.passwordNoMatch'));
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('auth.passwordTooShort'));
       return;
     }
 
     if (!token) {
-      setError('Invalid reset token. Please request a new password reset.');
+      setError(t('auth.invalidToken'));
       return;
     }
 
@@ -72,11 +74,11 @@ const ResetPassword = () => {
           handleNavigateToLogin();
         }, 3000);
       } else {
-        setError(data.message || 'Failed to reset password. Please try again.');
+        setError(data.message || t('auth.resetFailed'));
       }
     } catch (error) {
       console.error('Reset password error:', error);
-      setError('Cannot connect to server. Please check if backend is running on port 3000');
+      setError(t('auth.cannotConnect'));
     } finally {
       setLoading(false);
     }
@@ -114,9 +116,9 @@ const ResetPassword = () => {
           </div>
 
           <div className={styles.welcomeText}>
-            <h1>Create New<br />Password</h1>
+            <h1>{t('auth.createNewLine1')}<br />{t('auth.createNewLine2')}</h1>
             <p className={styles.welcomeSubtext}>
-              Enter your new password below
+              {t('auth.resetSubIdle')}
             </p>
           </div>
 
@@ -124,21 +126,21 @@ const ResetPassword = () => {
             <div className={styles.featureList}>
               <div className={styles.featureItem}>
                 <div className={styles.featureDot} />
-                <span>Choose a strong password</span>
+                <span>{t('auth.resetFeature1')}</span>
               </div>
               <div className={styles.featureItem}>
                 <div className={styles.featureDot} />
-                <span>At least 6 characters</span>
+                <span>{t('auth.resetFeature2')}</span>
               </div>
               <div className={styles.featureItem}>
                 <div className={styles.featureDot} />
-                <span>Keep it secure and memorable</span>
+                <span>{t('auth.resetFeature3')}</span>
               </div>
             </div>
           </div>
 
           <p className={styles.tagline}>
-            Your password should be strong and unique.
+            {t('auth.resetTagline')}
           </p>
         </div>
 
@@ -151,11 +153,11 @@ const ResetPassword = () => {
       <div className={`${styles.rightPanel} ${isTransitioning ? styles.fadeOut : styles.fadeIn}`}>
         <div className={styles.formWrapper}>
           <div className={styles.formHeader}>
-            <h2 className={styles.title}>Reset Password</h2>
+            <h2 className={styles.title}>{t('auth.resetTitle')}</h2>
             <p className={styles.subtitle}>
               {success 
-                ? 'Password reset successful!' 
-                : 'Enter your new password'}
+                ? t('auth.resetSubSuccess') 
+                : t('auth.resetSubIdle')}
             </p>
           </div>
 
@@ -176,21 +178,21 @@ const ResetPassword = () => {
             }}>
               <CheckCircle size={48} color="#4caf50" style={{ marginBottom: '1rem' }} />
               <div style={{ color: '#2e7d32', fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                Password Reset Successful!
+                {t('auth.resetSubSuccess')}
               </div>
               <div style={{ color: '#2e7d32', fontSize: '0.9rem' }}>
-                Redirecting to login page...
+                {t('auth.redirecting')}
               </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className={styles.form}>
               <div className={styles.inputGroup}>
-                <label className={styles.label} htmlFor="password">New Password</label>
+                <label className={styles.label} htmlFor="password">{t('auth.newPassword')}</label>
                 <div className={styles.inputWrapper}>
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your new password"
+                    placeholder={t('auth.newPasswordPlaceholder')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className={styles.input}
@@ -210,12 +212,12 @@ const ResetPassword = () => {
               </div>
 
               <div className={styles.inputGroup}>
-                <label className={styles.label} htmlFor="confirmPassword">Confirm Password</label>
+                <label className={styles.label} htmlFor="confirmPassword">{t('auth.confirmPassword')}</label>
                 <div className={styles.inputWrapper}>
                   <input
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm your new password"
+                    placeholder={t('auth.confirmPasswordPlaceholder')}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className={styles.input}
@@ -239,13 +241,13 @@ const ResetPassword = () => {
                 className={styles.loginButton}
                 disabled={loading || !token}
               >
-                {loading ? 'Resetting Password...' : 'Reset Password'}
+                {loading ? t('auth.resetting') : t('auth.resetPassword')}
               </button>
             </form>
           )}
 
           <p className={styles.signupLink}>
-            Remember your password? <a href="#" onClick={handleNavigateToLogin}>Back to Sign In</a>
+            {t('auth.rememberPassword')} <a href="#" onClick={handleNavigateToLogin}>{t('auth.backToSignIn')}</a>
           </p>
         </div>
 

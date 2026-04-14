@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
 import session from 'express-session';
 import passport from 'passport';
+import { createServer } from 'node:net';
 
 // Load environment variables immediately
 dotenv.config();
@@ -18,6 +19,29 @@ console.log(
   '  - JWT_SECRET:',
   process.env.JWT_SECRET ? '✅ Set' : '❌ Not set',
 );
+
+function isPortFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+    // Do not force host here; match Nest/Node default binding behavior (:: / any).
+    server.listen(port);
+  });
+}
+
+async function resolveAvailablePort(basePort: number, maxAttempts: number): Promise<number> {
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const candidate = basePort + i;
+    const free = await isPortFree(candidate);
+    if (free) return candidate;
+  }
+  throw new Error(
+    `Unable to start server. No free port found from ${basePort} to ${basePort + maxAttempts - 1}.`,
+  );
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -54,8 +78,18 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await app.listen(3000);
-  console.log(`✅ Application is running on: http://localhost:3000`);
+  const basePort = Number(process.env.PORT || 3000);
+  const maxAttempts = 15;
+  const activePort = await resolveAvailablePort(basePort, maxAttempts);
+  if (activePort !== basePort) {
+    console.warn(
+      `⚠️ Port ${basePort} is in use. Starting on port ${activePort} instead.`,
+    );
+  }
+
+  await app.listen(activePort);
+
+  console.log(`✅ Application is running on: http://localhost:${activePort}`);
   console.log(`🌐 CORS enabled for: ${frontendUrl}`);
 }
 void bootstrap();

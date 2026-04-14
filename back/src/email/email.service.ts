@@ -298,4 +298,63 @@ export class EmailService {
       });
     }
   }
+
+  async sendEvaluationResultEmail(
+    email: string,
+    name: string,
+    payload: {
+      title?: string;
+      cefrLevel?: string;
+      score?: number;
+      comments?: string;
+    },
+  ): Promise<string> {
+    const title = payload.title || 'Oral Performance';
+    const cefr = payload.cefrLevel || 'N/A';
+    const score = typeof payload.score === 'number' ? `${Math.round(payload.score)}/100` : 'N/A';
+    const comments = payload.comments || '';
+
+    const mailOptions = {
+      from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Your Evaluation Is Ready - EvalAI Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 30px; border-radius: 10px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="background: #E31837; width: 60px; height: 60px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+              <span style="color: white; font-size: 24px; font-weight: bold;">E</span>
+            </div>
+            <h1 style="color: #E31837; margin: 0;">Evaluation Completed</h1>
+          </div>
+
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">Hello <strong>${name}</strong>,</p>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">Your instructor has submitted your evaluation.</p>
+
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 25px 0; border: 1px solid #eee;">
+            <p style="margin: 0 0 10px; color: #555;"><strong>Session:</strong> ${title}</p>
+            <p style="margin: 0 0 10px; color: #555;"><strong>CEFR Level:</strong> <span style="color: #E31837; font-weight: 700;">${cefr}</span></p>
+            <p style="margin: 0; color: #555;"><strong>Score:</strong> ${score}</p>
+          </div>
+
+          ${comments ? `<div style="background: #fff; padding: 16px; border-radius: 8px; border-left: 4px solid #E31837;"><strong>Instructor Comments</strong><p style="margin: 8px 0 0; color: #555; line-height: 1.6;">${comments}</p></div>` : ''}
+
+          <div style="margin-top: 30px; padding: 20px; background-color: #f0f0f0; border-radius: 5px; text-align: center;">
+            <p style="margin: 0; color: #666;">Best regards,<br><strong>The EvalAI Team</strong></p>
+          </div>
+        </div>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Evaluation result email sent to ${email}`);
+      return info.messageId || '';
+    } catch (error) {
+      console.error(`❌ Failed to send evaluation result email to ${email}:`, {
+        message: error.message,
+        code: error.code,
+      });
+      throw error;
+    }
+  }
 }

@@ -3,11 +3,16 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { CommunicationController } from './communication.controller';
 import { CommunicationService } from './communication.service';
+import { CommunicationGateway } from './communication.gateway';
 import {
   Message,
   Conversation,
   Appointment,
   Notification,
+  Invitation,
+  Block,
+  Mute,
+  Report,
 } from './communication.models';
 import { Users } from '../users/users.models';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -19,6 +24,10 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
       Conversation,
       Appointment,
       Notification,
+      Invitation,
+      Block,
+      Mute,
+      Report,
       Users,
     ]),
     JwtModule.register({
@@ -27,7 +36,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
     }),
   ],
   controllers: [CommunicationController],
-  providers: [CommunicationService, JwtAuthGuard],
+  providers: [CommunicationService, CommunicationGateway, JwtAuthGuard],
   exports: [CommunicationService],
 })
 export class CommunicationModule {}

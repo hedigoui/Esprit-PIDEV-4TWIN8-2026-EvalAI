@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Post,
   Patch,
@@ -17,17 +18,31 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CommunicationService } from './communication.service';
+import { CommunicationGateway } from './communication.gateway';
 import { MessageType } from './communication.models';
-import type { Express } from 'express';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthUser } from '../auth/jwt-auth.guard';
 
 type AuthedRequest = Request & { user: AuthUser };
+type UploadedFile = {
+  originalname: string;
+  mimetype: string;
+  buffer: Buffer;
+  size: number;
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  return 'Unexpected error';
+};
 
 @Controller('communication')
 export class CommunicationController {
-  constructor(private readonly communicationService: CommunicationService) {}
+  constructor(
+    private readonly communicationService: CommunicationService,
+    private readonly communicationGateway: CommunicationGateway,
+  ) {}
 
   // ===== MESSAGING ENDPOINTS =====
 
@@ -57,13 +72,21 @@ export class CommunicationController {
         type,
       );
 
+      const notification = await this.communicationService.createMessageNotification(
+        senderId,
+        receiverId,
+        message._id.toString(),
+        message.content,
+      );
+
       return {
         success: true,
         message: 'Message sent successfully',
         data: message,
+        notification,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+        throw new BadRequestException(getErrorMessage(error));
     }
   }
 
@@ -72,7 +95,6 @@ export class CommunicationController {
   async getConversation(
     @Param('userId') userId: string,
     @Req() req: AuthedRequest,
-    @Query('limit') limit?: string,
   ) {
     try {
       const currentUserId = req.user?.sub;
@@ -83,7 +105,7 @@ export class CommunicationController {
       const messages = await this.communicationService.getConversationMessages(
         currentUserId,
         userId,
-        limit ? parseInt(limit, 10) : 50,
+        50,
       );
 
       const otherUser = await this.communicationService.getUserById(userId);
@@ -98,7 +120,7 @@ export class CommunicationController {
         },
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+        throw new BadRequestException(getErrorMessage(error));
     }
   }
 
@@ -118,19 +140,41 @@ export class CommunicationController {
         data: conversations,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+        throw new BadRequestException(getErrorMessage(error));
     }
+  }
+
+  @Delete('conversations/:userId')
+  @UseGuards(JwtAuthGuard)
+  async deleteConversation(
+    @Param('userId') otherUserId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    await this.communicationService.deleteConversation(userId, otherUserId);
+    this.communicationGateway.emitConversationUpdate({
+      userId,
+      otherUserId,
+    });
+
+    return { success: true };
   }
 
   @Post('messages/upload')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadFileMessage(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: UploadedFile,
     @Body()
     body: {
       receiverId: string;
       content: string;
+      type?: MessageType;
+      duration?: string;
     },
     @Req() req: AuthedRequest,
   ) {
@@ -143,35 +187,205 @@ export class CommunicationController {
       if (!senderId) {
         throw new UnauthorizedException('Invalid token');
       }
-      const { receiverId, content } = body;
+      const { receiverId, content, type = MessageType.FILE, duration } = body;
+      const durationSeconds = duration ? Number(duration) : undefined;
+      if (durationSeconds !== undefined && Number.isNaN(durationSeconds)) {
+        throw new BadRequestException('Invalid duration');
+      }
 
       // For now, store file info as base64
       // In production, you'd want to upload to cloud storage
-      const _fileData = {
-        filename: file.originalname,
-        mimetype: file.mimetype,
-        size: file.size,
-        data: file.buffer.toString('base64'),
-      };
+      const fileDataUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
 
-      const message = await this.communicationService.sendMessage(
+      const message = await this.communicationService.sendFileMessage(
         senderId,
         receiverId,
-        content,
-        MessageType.FILE,
+        {
+          content,
+          type,
+          fileName: file.originalname,
+          fileUrl: fileDataUrl,
+          fileSize: file.size,
+          duration: durationSeconds,
+        },
       );
 
-      // Update message with file info
-      // You would typically update the message with file URL here
+      const notification = await this.communicationService.createMessageNotification(
+        senderId,
+        receiverId,
+        message._id.toString(),
+        message.content,
+      );
+
+      this.communicationGateway.emitNewMessage(message as any, notification);
 
       return {
         success: true,
         message: 'File message sent successfully',
         data: message,
+        notification,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+        throw new BadRequestException(getErrorMessage(error));
     }
+  }
+
+  @Delete('messages/:id')
+  @UseGuards(JwtAuthGuard)
+  async deleteMessage(
+    @Param('id') id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    const deleted = await this.communicationService.deleteMessage(userId, id);
+    this.communicationGateway.emitMessageDeleted({
+      messageId: id,
+      senderId: deleted.senderId,
+      receiverId: deleted.receiverId,
+    });
+
+    return { success: true, data: deleted };
+  }
+
+  @Patch('messages/:id')
+  @UseGuards(JwtAuthGuard)
+  async updateMessage(
+    @Param('id') id: string,
+    @Body() body: { content: string },
+    @Req() req: AuthedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    const updated = await this.communicationService.updateMessage(
+      userId,
+      id,
+      body.content,
+    );
+
+    this.communicationGateway.emitMessageUpdated({
+      message: updated,
+      senderId: updated.senderId,
+      receiverId: updated.receiverId,
+    });
+
+    return { success: true, data: updated };
+  }
+
+  @Get('blocks')
+  @UseGuards(JwtAuthGuard)
+  async getBlocks(@Req() req: AuthedRequest) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    const blocks = await this.communicationService.getBlocks(userId);
+    return { success: true, data: blocks };
+  }
+
+  @Post('blocks')
+  @UseGuards(JwtAuthGuard)
+  async blockUser(
+    @Body() body: { blockedId: string },
+    @Req() req: AuthedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    if (!body?.blockedId) {
+      throw new BadRequestException('blockedId is required');
+    }
+    const block = await this.communicationService.blockUser(userId, body.blockedId);
+    this.communicationGateway.emitConversationUpdate({ userId, otherUserId: body.blockedId });
+    return { success: true, data: block };
+  }
+
+  @Delete('blocks/:blockedId')
+  @UseGuards(JwtAuthGuard)
+  async unblockUser(
+    @Param('blockedId') blockedId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    await this.communicationService.unblockUser(userId, blockedId);
+    this.communicationGateway.emitConversationUpdate({ userId, otherUserId: blockedId });
+    return { success: true };
+  }
+
+  @Get('mutes')
+  @UseGuards(JwtAuthGuard)
+  async getMutes(@Req() req: AuthedRequest) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    const mutes = await this.communicationService.getMutes(userId);
+    return { success: true, data: mutes };
+  }
+
+  @Post('mutes')
+  @UseGuards(JwtAuthGuard)
+  async muteUser(
+    @Body() body: { mutedUserId: string },
+    @Req() req: AuthedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    if (!body?.mutedUserId) {
+      throw new BadRequestException('mutedUserId is required');
+    }
+    const mute = await this.communicationService.muteUser(userId, body.mutedUserId);
+    this.communicationGateway.emitConversationUpdate({ userId, otherUserId: body.mutedUserId });
+    return { success: true, data: mute };
+  }
+
+  @Delete('mutes/:mutedUserId')
+  @UseGuards(JwtAuthGuard)
+  async unmuteUser(
+    @Param('mutedUserId') mutedUserId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    await this.communicationService.unmuteUser(userId, mutedUserId);
+    this.communicationGateway.emitConversationUpdate({ userId, otherUserId: mutedUserId });
+    return { success: true };
+  }
+
+  @Post('reports')
+  @UseGuards(JwtAuthGuard)
+  async reportUser(
+    @Body() body: { reportedId: string; reason?: string; messageId?: string },
+    @Req() req: AuthedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    if (!body?.reportedId) {
+      throw new BadRequestException('reportedId is required');
+    }
+    const report = await this.communicationService.createReport(
+      userId,
+      body.reportedId,
+      body.reason,
+      body.messageId,
+    );
+    return { success: true, data: report };
   }
 
   // ===== APPOINTMENT ENDPOINTS =====
@@ -214,7 +428,7 @@ export class CommunicationController {
         data: appointment,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+        throw new BadRequestException(getErrorMessage(error));
     }
   }
 
@@ -233,7 +447,7 @@ export class CommunicationController {
         data: appointments,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+        throw new BadRequestException(getErrorMessage(error));
     }
   }
 
@@ -259,98 +473,166 @@ export class CommunicationController {
         data: appointment,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+        throw new BadRequestException(getErrorMessage(error));
     }
   }
 
   // ===== NOTIFICATION ENDPOINTS =====
 
   @Get('notifications')
-  async getNotifications(@Query('unreadOnly') _unreadOnly?: string) {
-    try {
-      // TODO: Get userId from JWT token properly
-      const userId = 'temp-user-id';
-      const notifications =
-        await this.communicationService.getNotifications(userId);
-
-      return {
-        success: true,
-        data: notifications,
-      };
-    } catch (error) {
-      throw new BadRequestException(error.message);
+  @UseGuards(JwtAuthGuard)
+  async getNotifications(@Req() req: AuthedRequest) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
     }
+    const notifications = await this.communicationService.getNotifications(
+      userId,
+    );
+    return { success: true, data: notifications };
   }
 
   @Patch('notifications/:id/read')
-  async markNotificationAsRead(@Param('id') id: string) {
-    try {
-      // TODO: Get userId from JWT token properly
-      const _userId = 'temp-user-id';
-      await this.communicationService.markNotificationAsRead(id);
-
-      return {
-        success: true,
-        message: 'Notification marked as read',
-      };
-    } catch (error) {
-      throw new BadRequestException(error.message);
-    }
+  @UseGuards(JwtAuthGuard)
+  async markNotificationRead(@Param('id') id: string) {
+    await this.communicationService.markNotificationAsRead(id);
+    return { success: true };
   }
 
   @Patch('notifications/read-all')
-  async markAllNotificationsAsRead() {
-    try {
-      // TODO: Get userId from JWT token properly
-      const userId = 'temp-user-id';
-      await this.communicationService.markAllNotificationsAsRead(userId);
-
-      return {
-        success: true,
-        message: 'All notifications marked as read',
-      };
-    } catch (error) {
-      throw new BadRequestException(error.message);
+  @UseGuards(JwtAuthGuard)
+  async markAllNotificationsRead(@Req() req: AuthedRequest) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
     }
+    await this.communicationService.markAllNotificationsAsRead(userId);
+    return { success: true };
   }
 
-  // ===== STUDENT-TEACHER INTERACTION ENDPOINTS =====
+  // ===== INVITATION ENDPOINTS =====
+
+  @Post('invitations')
+  @UseGuards(JwtAuthGuard)
+  async createInvitation(
+    @Body() body: { studentId?: string; studentEmail?: string },
+    @Req() req: AuthedRequest,
+  ) {
+    const teacherId = req.user?.sub;
+    if (!teacherId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    if (req.user?.role !== 'instructor') {
+      throw new UnauthorizedException('Only instructors can invite students');
+    }
+
+    let studentId = body.studentId;
+    if (!studentId && body.studentEmail) {
+      const student = await this.communicationService.getUserByEmail(
+        body.studentEmail,
+      );
+      if (!student || student.role !== 'student') {
+        throw new BadRequestException('Student not found');
+      }
+      studentId = student.id;
+    }
+
+    if (!studentId) {
+      throw new BadRequestException('Student ID or email is required');
+    }
+
+    const invitation = await this.communicationService.createInvitation(
+      teacherId,
+      studentId,
+    );
+
+    return { success: true, data: invitation };
+  }
+
+  @Get('invitations/received')
+  @UseGuards(JwtAuthGuard)
+  async getReceivedInvitations(@Req() req: AuthedRequest) {
+    const studentId = req.user?.sub;
+    if (!studentId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    const invitations =
+      await this.communicationService.getInvitationsForStudent(studentId);
+    return { success: true, data: invitations };
+  }
+
+  @Get('invitations/sent')
+  @UseGuards(JwtAuthGuard)
+  async getSentInvitations(@Req() req: AuthedRequest) {
+    const teacherId = req.user?.sub;
+    if (!teacherId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    const invitations =
+      await this.communicationService.getInvitationsForTeacher(teacherId);
+    return { success: true, data: invitations };
+  }
+
+  @Patch('invitations/:id/accept')
+  @UseGuards(JwtAuthGuard)
+  async acceptInvitation(
+    @Param('id') id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    const studentId = req.user?.sub;
+    if (!studentId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    const invitation = await this.communicationService.acceptInvitation(
+      id,
+      studentId,
+    );
+    return { success: true, data: invitation };
+  }
+
+  @Patch('invitations/:id/reject')
+  @UseGuards(JwtAuthGuard)
+  async rejectInvitation(
+    @Param('id') id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    const studentId = req.user?.sub;
+    if (!studentId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    const invitation = await this.communicationService.rejectInvitation(
+      id,
+      studentId,
+    );
+    return { success: true, data: invitation };
+  }
 
   @Get('students')
-  async getTeacherStudents() {
-    try {
-      // TODO: Get teacherId from JWT token properly
-      const _teacherId = 'temp-teacher-id';
-
-      // This would typically get students assigned to this teacher
-      // For now, we'll return all students (you might want to add a relationship)
-
-      return {
-        success: true,
-        message: 'Teacher students retrieved successfully',
-        // data: students,
-      };
-    } catch (error) {
-      throw new BadRequestException(error.message);
+  @UseGuards(JwtAuthGuard)
+  async getAssignedStudents(
+    @Req() req: AuthedRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const teacherId = req.user?.sub;
+    if (!teacherId) {
+      throw new UnauthorizedException('Invalid token');
     }
-  }
-
-  @Get('teachers')
-  async getStudentTeachers() {
-    try {
-      // TODO: Get studentId from JWT token properly
-      const _studentId = 'temp-student-id';
-
-      // This would typically get teachers assigned to this student
-
-      return {
-        success: true,
-        message: 'Student teachers retrieved successfully',
-        // data: teachers,
-      };
-    } catch (error) {
-      throw new BadRequestException(error.message);
+    if (req.user?.role !== 'instructor') {
+      throw new UnauthorizedException('Only instructors can view assigned students');
     }
+    if (page || limit) {
+      const parsedPage = Number(page ?? 1);
+      const parsedLimit = Number(limit ?? 20);
+      const result = await this.communicationService.getAssignedStudentsPaginated(
+        teacherId,
+        parsedPage,
+        parsedLimit,
+      );
+      return { success: true, ...result };
+    }
+    const students = await this.communicationService.getAssignedStudents(teacherId);
+    return { success: true, data: students };
   }
 
   @Post('feedback')
@@ -386,7 +668,7 @@ export class CommunicationController {
         data: message,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(getErrorMessage(error));
     }
   }
 
@@ -416,7 +698,7 @@ export class CommunicationController {
         message: 'Announcement sent successfully',
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(getErrorMessage(error));
     }
   }
 }

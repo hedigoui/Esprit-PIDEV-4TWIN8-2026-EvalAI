@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   HttpCode,
   HttpStatus,
   BadRequestException,
@@ -29,6 +30,7 @@ export class UsersController {
       password: string;
       firstName: string;
       lastName: string;
+      gender?: 'male' | 'female';
       role: UserRole;
       isActive: boolean;
     },
@@ -53,8 +55,20 @@ export class UsersController {
   }
 
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  async findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (!page && !limit) {
+      return this.usersService.findAll();
+    }
+    const parsedPage = Number(page ?? 1);
+    const parsedLimit = Number(limit ?? 20);
+    const result = await this.usersService.findAllPaginated(
+      parsedPage,
+      parsedLimit,
+    );
+    return { success: true, ...result };
   }
 
   @Get('students')
@@ -69,6 +83,22 @@ export class UsersController {
       };
     } catch (error) {
       console.error('Error getting students:', error);
+      throw error;
+    }
+  }
+
+  @Get('instructors')
+  async getInstructors() {
+    try {
+      console.log('🔍 Controller: Getting instructors...');
+      const instructors = await this.usersService.getInstructors();
+      console.log(`🔍 Controller: Returning ${instructors.length} instructors`);
+      return {
+        success: true,
+        data: instructors,
+      };
+    } catch (error) {
+      console.error('Error getting instructors:', error);
       throw error;
     }
   }
@@ -182,6 +212,7 @@ export class UsersController {
       firstName?: string;
       lastName?: string;
       email?: string;
+      gender?: 'male' | 'female';
       phone?: string;
       bio?: string;
       avatar?: string;

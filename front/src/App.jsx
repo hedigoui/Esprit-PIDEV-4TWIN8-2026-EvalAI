@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import Profile from './pages/Profile';
@@ -18,6 +18,7 @@ import StudentReclamations from './pages/student/Reclamations';
 import TeacherDashboard from './pages/teacher/Dashboard';
 import TeacherStudents from './pages/teacher/Students';
 import TeacherEvaluate from './pages/teacher/Evaluate';
+import TeacherEvaluations from './pages/teacher/Evaluations';
 import TeacherReports from './pages/teacher/Reports';
 import TeacherSettings from './pages/teacher/Settings';
 import TeacherReclamations from './pages/teacher/Reclamations';
@@ -27,6 +28,15 @@ import AdminUsers from './pages/admin/Users';
 import AdminReports from './pages/admin/Reports';
 import AdminSettings from './pages/admin/Settings';
 import AdminReclamations from './pages/admin/Reclamations';
+import { NotificationCenterProvider } from './context/NotificationCenter';
+
+function AppWithNotifications() {
+  return (
+    <NotificationCenterProvider>
+      <Outlet />
+    </NotificationCenterProvider>
+  );
+}
 
 
 function App() {
@@ -38,30 +48,35 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/conversations" element={<Conversations />} />
-        <Route path="/messages/:userId" element={<Messages />} />
-        {/* Student Routes */}
-        <Route path="/student/dashboard" element={<StudentDashboard />} />
-        <Route path="/student/practice" element={<StudentPractice />} />
-        <Route path="/student/reports" element={<StudentReports />} />
-        <Route path="/student/settings" element={<StudentSettings />} />
-        <Route path="/student/reclamations" element={<StudentReclamations />} />
-        {/* Teacher Routes */}
-        <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
-        <Route path="/teacher/students" element={<TeacherStudents />} />
-        <Route path="/teacher/evaluate" element={<TeacherEvaluate />} />
-        <Route path="/teacher/evaluate/:studentId" element={<TeacherEvaluate />} />
-        <Route path="/teacher/reports" element={<TeacherReports />} />
-        <Route path="/teacher/settings" element={<TeacherSettings />} />
-        <Route path="/teacher/reclamations" element={<TeacherReclamations />} />
 
-        {/* Admin Routes */}
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        <Route path="/admin/users" element={<AdminUsers />} />
-        <Route path="/admin/reports" element={<AdminReports />} />
-        <Route path="/admin/settings" element={<AdminSettings />} />
-        <Route path="/admin/reclamations" element={<AdminReclamations />} />
+        <Route element={<AppWithNotifications />}>
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/conversations" element={<Conversations />} />
+          <Route path="/messages/:userId" element={<Messages />} />
+          {/* Student Routes */}
+          <Route path="/student/dashboard" element={<StudentDashboard />} />
+          <Route path="/student/practice" element={<StudentPractice />} />
+          <Route path="/student/reports" element={<StudentReports />} />
+          <Route path="/student/settings" element={<StudentSettings />} />
+          <Route path="/student/reclamations" element={<StudentReclamations />} />
+          {/* Teacher Routes */}
+          <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
+          <Route path="/teacher/students" element={<TeacherStudents />} />
+          <Route path="/teacher/evaluations" element={<TeacherEvaluations />} />
+          <Route path="/teacher/evaluate" element={<TeacherEvaluate />} />
+          <Route path="/teacher/evaluate/:studentId" element={<TeacherEvaluate />} />
+          <Route path="/teacher/evaluate/:studentId/:performanceId" element={<TeacherEvaluate />} />
+          <Route path="/teacher/reports" element={<TeacherReports />} />
+          <Route path="/teacher/settings" element={<TeacherSettings />} />
+          <Route path="/teacher/reclamations" element={<TeacherReclamations />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/reports" element={<AdminReports />} />
+          <Route path="/admin/settings" element={<AdminSettings />} />
+          <Route path="/admin/reclamations" element={<AdminReclamations />} />
+        </Route>
       </Routes>
     </Router>
   );

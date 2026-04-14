@@ -26,6 +26,9 @@ export class Users {
   @Column({ nullable: true })
   bio: string;
 
+  @Column({ nullable: true })
+  gender?: 'male' | 'female';
+
   @Column()
   password: string;
 

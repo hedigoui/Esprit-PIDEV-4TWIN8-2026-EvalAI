@@ -168,7 +168,7 @@ export class Notification {
   relatedEntityId?: string; // Message ID, Appointment ID, etc.
 
   @Column({ nullable: true })
-  relatedEntityType?: 'message' | 'appointment' | 'feedback' | 'announcement';
+  relatedEntityType?: 'message' | 'appointment' | 'feedback' | 'announcement' | 'invitation';
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
@@ -183,4 +183,76 @@ export class Notification {
 
   @Column()
   userId: string;
+}
+
+@Entity()
+export class Invitation {
+  @ObjectIdColumn()
+  _id: ObjectId;
+
+  @Column()
+  teacherId: string;
+
+  @Column()
+  studentId: string;
+
+  @Column({ default: 'pending' })
+  status: 'pending' | 'accepted' | 'rejected';
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  createdAt: Date;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  updatedAt: Date;
+}
+
+@Entity()
+export class Block {
+  @ObjectIdColumn()
+  _id: ObjectId;
+
+  @Column()
+  blockerId: string;
+
+  @Column()
+  blockedId: string;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  createdAt: Date;
+}
+
+@Entity()
+export class Mute {
+  @ObjectIdColumn()
+  _id: ObjectId;
+
+  @Column()
+  userId: string;
+
+  @Column()
+  mutedUserId: string;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  createdAt: Date;
+}
+
+@Entity()
+export class Report {
+  @ObjectIdColumn()
+  _id: ObjectId;
+
+  @Column()
+  reporterId: string;
+
+  @Column()
+  reportedId: string;
+
+  @Column({ nullable: true })
+  reason?: string;
+
+  @Column({ nullable: true })
+  messageId?: string;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  createdAt: Date;
 }

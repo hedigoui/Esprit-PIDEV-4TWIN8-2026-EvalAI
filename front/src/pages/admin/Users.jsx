@@ -1,21 +1,350 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
-import { Search, Plus, Edit2, Trash2, Filter, Power, PowerOff, X, User, Mail, Lock } from 'lucide-react';
+import TopNavbar from '../../components/TopNavbar';
+import { Search, Plus, Trash2, Power, PowerOff, X, Users as UsersIcon, TrendingUp } from 'lucide-react';
 import axios from 'axios';
 import styles from '../../styles/shared.module.css';
-import studentsStyles from '../teacher/Students.module.css';
+import { useI18n } from '../../i18n/I18nProvider';
 
 const API_URL = 'http://localhost:3000';
+const PAGE_SIZE = 20;
+
+const usersPageStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+  .au-root * { font-family: 'Manrope', sans-serif; box-sizing: border-box; }
+
+  .au-root {
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg-main);
+  }
+
+  .au-main { flex: 1; min-width: 0; overflow-y: auto; }
+
+  .au-content {
+    max-width: 1280px;
+    padding: 2rem 2.5rem;
+    margin: 0 auto;
+  }
+
+  .au-hero {
+    background: linear-gradient(135deg, #121826 0%, #1f2937 60%, var(--primary) 150%);
+    border-radius: 24px;
+    padding: 2.25rem;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.2);
+  }
+
+  .au-hero::before {
+    content: '';
+    position: absolute;
+    top: -60px;
+    right: -60px;
+    width: 280px;
+    height: 280px;
+    background: radial-gradient(circle, rgba(227,24,55,0.22) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .au-hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(227,24,55,0.95);
+    background: rgba(227,24,55,0.14);
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    margin-bottom: 0.75rem;
+    border: 1px solid rgba(227,24,55,0.25);
+  }
+
+  .au-hero-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.04em;
+    margin: 0 0 0.4rem;
+  }
+
+  .au-hero-sub {
+    color: rgba(255,255,255,0.6);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    max-width: 420px;
+    margin: 0;
+  }
+
+  .au-hero-icon {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: rgba(227,24,55,0.2);
+    border: 1px solid rgba(227,24,55,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.8);
+    flex-shrink: 0;
+  }
+
+  .au-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+
+  .au-section-title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .au-section-sub {
+    margin: 0.3rem 0 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+
+  .au-stats-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .au-mini-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 14px;
+    padding: 0.6rem 1rem;
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(10px);
+  }
+
+  .au-mini-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: var(--primary-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .au-mini-num {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .au-mini-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .au-primary-btn {
+    padding: 0.65rem 1.25rem;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    box-shadow: 0 6px 18px var(--primary-glow);
+  }
+
+  .au-controls {
+    background: var(--bg-card);
+    border-radius: 20px;
+    border: 1px solid var(--border-light);
+    padding: 1.1rem 1.4rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(12px);
+  }
+
+  .au-controls-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .au-search {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+  }
+
+  .au-search-icon {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  .au-search-input {
+    width: 100%;
+    padding: 0.7rem 0.75rem 0.7rem 2.5rem;
+    border: 1.5px solid var(--border-light);
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-family: 'Manrope', sans-serif;
+    background: var(--bg-card-solid);
+    color: var(--text-primary);
+    transition: all 0.2s;
+    outline: none;
+  }
+
+  .au-search-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+  }
+
+  .au-table-card {
+    background: var(--bg-card);
+    border-radius: 20px;
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .au-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+
+  .au-table th {
+    text-align: left;
+    padding: 1rem 1.25rem;
+    color: var(--text-muted);
+    font-weight: 700;
+    background: rgba(0,0,0,0.02);
+  }
+
+  [data-theme='dark'] .au-table th {
+    background: rgba(255,255,255,0.03);
+  }
+
+  .au-table td {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border-light);
+    color: var(--text-primary);
+    vertical-align: middle;
+  }
+
+  .au-table tbody tr:hover {
+    background: var(--primary-soft);
+  }
+
+  .au-user-cell { display: flex; align-items: center; gap: 0.75rem; }
+
+  .au-user-name { font-weight: 600; color: var(--text-primary); }
+
+  .au-muted { color: var(--text-secondary); }
+
+  .au-actions { display: flex; gap: 0.5rem; }
+
+  .au-action-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--border-light);
+    background: var(--bg-card-solid);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+  }
+
+  .au-action-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-soft);
+    transform: translateY(-1px);
+  }
+
+  .au-empty {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+  }
+
+  .au-alert {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    color: #ef4444;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .au-alert-btn {
+    padding: 0.5rem 1rem;
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  @media (max-width: 900px) {
+    .au-content { padding: 1.5rem; }
+    .au-hero { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
+    .au-hero-icon { align-self: flex-end; }
+  }
+`;
 
 const Users = () => {
   const navigate = useNavigate();
+  const { t, language } = useI18n();
+  const locale = language === 'fr' ? 'fr-FR' : 'en-US';
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(null);
   const [error, setError] = useState('');
   const [togglingId, setTogglingId] = useState(null);
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
+  const loadMoreRef = useRef(null);
   
   // Add User Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -23,6 +352,7 @@ const Users = () => {
     firstName: '',
     lastName: '',
     email: '',
+    gender: '',
     role: 'student',
     password: '',
     isActive: true
@@ -30,9 +360,10 @@ const Users = () => {
   const [addingUser, setAddingUser] = useState(false);
   const [addError, setAddError] = useState('');
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (pageToLoad = 1, append = false) => {
     try {
-      setLoading(true);
+      if (pageToLoad === 1) setLoading(true);
+      else setLoadingMore(true);
       const token = localStorage.getItem('token'); // FIXED: Changed from 'access_token' to 'token'
       
       if (!token) {
@@ -41,15 +372,18 @@ const Users = () => {
       }
 
       const response = await axios.get(`${API_URL}/users`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        params: { page: pageToLoad, limit: PAGE_SIZE },
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       console.log('Raw users from backend:', response.data);
 
       // Transform the data to match your frontend format
-      const formattedUsers = response.data.map(user => ({
+      const rawUsers = Array.isArray(response.data)
+        ? response.data
+        : (Array.isArray(response.data?.data) ? response.data.data : []);
+
+      const formattedUsers = rawUsers.map(user => ({
         id: user._id || user.id,
         _id: user._id,
         firstName: user.firstName,
@@ -57,10 +391,10 @@ const Users = () => {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
         avatar: user.avatar,
-        role: user.role.charAt(0).toUpperCase() + user.role.slice(1),
+        role: user.role,
         isActive: user.isActive,
-        status: user.isActive ? 'Active' : 'Inactive',
-        joined: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { 
+        status: user.isActive ? 'active' : 'inactive',
+        joined: user.createdAt ? new Date(user.createdAt).toLocaleDateString(locale, {
           month: 'short', 
           day: 'numeric', 
           year: 'numeric' 
@@ -68,11 +402,15 @@ const Users = () => {
       }));
 
       console.log('Formatted users:', formattedUsers);
-      setUsers(formattedUsers);
+      setUsers(prev => (append ? [...prev, ...formattedUsers] : formattedUsers));
+      const total = typeof response.data?.total === 'number' ? response.data.total : formattedUsers.length;
+      setTotalCount(total);
+      setHasMore(pageToLoad * PAGE_SIZE < total);
+      setPage(pageToLoad);
       setError('');
     } catch (error) {
       console.error('Error fetching users:', error);
-      setError('Failed to load users. Please try again.');
+      setError(t('adminUsers.loadFailed'));
       
       if (error.response?.status === 401) {
         localStorage.removeItem('token');
@@ -81,8 +419,9 @@ const Users = () => {
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [navigate]);
+  }, [navigate, locale, t]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -111,8 +450,23 @@ const Users = () => {
       }
     }
 
-    void fetchUsers();
+    void fetchUsers(1, false);
   }, [navigate, fetchUsers]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first.isIntersecting && hasMore && !loadingMore) {
+          void fetchUsers(page + 1, true);
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [fetchUsers, hasMore, loadingMore, page]);
 
   // Delete user
   const handleDeleteUser = async (userId) => {
@@ -120,11 +474,11 @@ const Users = () => {
     
     if (!userId) {
       console.error('No user ID provided');
-      alert('Cannot delete user: No ID provided');
+      alert(t('adminUsers.deleteNoId'));
       return;
     }
 
-    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+    if (!window.confirm(t('adminUsers.deleteConfirm'))) {
       return;
     }
 
@@ -144,7 +498,7 @@ const Users = () => {
       // Remove the user from local state
       setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
       
-      alert('User deleted successfully');
+      alert(t('adminUsers.deleteSuccess'));
       
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -155,7 +509,7 @@ const Users = () => {
         localStorage.removeItem('user');
         navigate('/');
       } else {
-        alert(`Failed to delete user: ${error.response?.data?.message || error.message}`);
+        alert(t('adminUsers.deleteFailed', { message: error.response?.data?.message || error.message }));
       }
     }
   };
@@ -166,7 +520,7 @@ const Users = () => {
     
     if (!userId) {
       console.error('No user ID provided');
-      alert('Cannot update user: No ID provided');
+      alert(t('adminUsers.updateNoId'));
       return;
     }
 
@@ -197,7 +551,7 @@ const Users = () => {
             ? { 
                 ...user, 
                 isActive: !currentStatus,
-                status: !currentStatus ? 'Active' : 'Inactive'
+                status: !currentStatus ? 'active' : 'inactive'
               } 
             : user
         )
@@ -212,7 +566,7 @@ const Users = () => {
         localStorage.removeItem('user');
         navigate('/');
       } else {
-        alert(`Failed to update user status: ${error.response?.data?.message || error.message}`);
+        alert(t('adminUsers.updateFailed', { message: error.response?.data?.message || error.message }));
       }
       
       // Refresh the users list
@@ -222,13 +576,44 @@ const Users = () => {
     }
   };
 
-  // Filter users based on search term and role filter
+  // Filter users based on search term
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || user.role.toLowerCase() === roleFilter;
-    return matchesSearch && matchesRole;
+    return matchesSearch;
   });
+
+  const sortedUsers = [...filteredUsers]
+    .filter(user => user.role !== 'admin')
+    .sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortKey === 'name') return a.name.localeCompare(b.name) * dir;
+      if (sortKey === 'email') return a.email.localeCompare(b.email) * dir;
+      if (sortKey === 'role') return a.role.localeCompare(b.role) * dir;
+      if (sortKey === 'joined') {
+        const aDate = new Date(a.joined || 0).getTime();
+        const bDate = new Date(b.joined || 0).getTime();
+        return (aDate - bDate) * dir;
+      }
+      return 0;
+    });
+
+  const toggleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const sortIcon = (key) => {
+    if (sortKey !== key) return '↕';
+    return sortDir === 'asc' ? '▲' : '▼';
+  };
+
+  const totalUsers = totalCount ?? users.length;
+  const activeUsers = users.filter((user) => user.isActive).length;
 
   // Generate a temporary password (8 characters)
   const generatePassword = () => {
@@ -245,8 +630,8 @@ const Users = () => {
     e.preventDefault();
     setAddError('');
 
-    if (!newUser.firstName || !newUser.lastName || !newUser.email || !newUser.role) {
-      setAddError('All fields are required');
+    if (!newUser.firstName || !newUser.lastName || !newUser.email || !newUser.gender || !newUser.role) {
+      setAddError(t('adminUsers.requiredFields'));
       return;
     }
 
@@ -262,6 +647,7 @@ const Users = () => {
         firstName: newUser.firstName,
         lastName: newUser.lastName,
         email: newUser.email,
+        gender: newUser.gender,
         role: newUser.role,
         password: password,
         isActive: newUser.isActive
@@ -279,6 +665,7 @@ const Users = () => {
         firstName: '',
         lastName: '',
         email: '',
+        gender: '',
         role: 'student',
         password: '',
         isActive: true
@@ -288,11 +675,11 @@ const Users = () => {
       setShowAddModal(false);
       fetchUsers();
       
-      alert(`User created successfully! Password: ${password}\n\nPlease share this password with the user.`);
+      alert(t('adminUsers.userCreated', { password }));
       
     } catch (error) {
       console.error('Error adding user:', error);
-      setAddError(error.response?.data?.message || error.message || 'Failed to create user');
+      setAddError(error.response?.data?.message || error.message || t('adminUsers.createFailed'));
     } finally {
       setAddingUser(false);
     }
@@ -310,118 +697,150 @@ const Users = () => {
   // Loading state
   if (loading) {
     return (
-      <div className={styles.layout}>
-        <AdminSidebar />
-        <div className={styles.mainContent}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-            <div className={styles.spinner} />
+      <>
+        <style>{usersPageStyles}</style>
+        <div className="au-root">
+          <AdminSidebar />
+          <div className="au-main">
+            <TopNavbar />
+            <div className="au-content">
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+                <div className={styles.spinner} />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className={styles.layout}>
-      <AdminSidebar />
-      <div className={styles.mainContent}>
-        <main className={styles.content}>
-          {/* Page Header */}
-          <div className={styles.pageHeader}>
-            <div>
-              <h1 className={styles.pageTitle}>User Management</h1>
-              <p className={styles.pageSubtitle}>Manage all platform users</p>
+    <>
+      <style>{usersPageStyles}</style>
+      <div className="au-root">
+        <AdminSidebar />
+        <div className="au-main">
+          <TopNavbar />
+          <div className="au-content">
+            <div className="au-hero">
+              <div>
+                <div className="au-hero-kicker">{t('adminUsers.heroKicker')}</div>
+                <h1 className="au-hero-title">{t('adminUsers.heroTitle')}</h1>
+                <p className="au-hero-sub">
+                  {t('adminUsers.heroSubtitle')}
+                </p>
+              </div>
+              <div className="au-hero-icon">
+                <UsersIcon size={36} strokeWidth={1.5} />
+              </div>
             </div>
-            <button 
-              className={styles.primaryButton}
-              onClick={() => setShowAddModal(true)}
-            >
-              <Plus size={18} />
-              Add User
-            </button>
-          </div>
 
-          {/* Error Message */}
-          {error && (
-            <div style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fee2e2',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '1.5rem',
-              color: '#dc2626',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <span>{error}</span>
-              <button 
-                onClick={fetchUsers}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#dc2626',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem'
-                }}
+            <div className="au-header">
+              <div>
+                <h2 className="au-section-title">{t('adminUsers.sectionTitle')}</h2>
+                <p className="au-section-sub">{t('adminUsers.sectionSub')}</p>
+              </div>
+              <div className="au-stats-row">
+                <div className="au-mini-stat">
+                  <div className="au-mini-icon"><UsersIcon size={16} color="var(--primary)" /></div>
+                  <div>
+                    <div className="au-mini-num">{totalUsers}</div>
+                      <div className="au-mini-label">{t('adminUsers.totalLabel')}</div>
+                  </div>
+                </div>
+                <div className="au-mini-stat">
+                  <div className="au-mini-icon"><TrendingUp size={16} color="var(--green)" /></div>
+                  <div>
+                    <div className="au-mini-num">{activeUsers}</div>
+                      <div className="au-mini-label">{t('adminUsers.activeLabel')}</div>
+                  </div>
+                </div>
+              </div>
+              <button
+                className="au-primary-btn"
+                onClick={() => setShowAddModal(true)}
               >
-                Retry
+                <Plus size={18} />
+                {t('adminUsers.addUser')}
               </button>
             </div>
-          )}
 
-          {/* Filters */}
-          <div className={studentsStyles.filters}>
-            <div className={studentsStyles.searchBox}>
-              <Search size={18} className={studentsStyles.searchIcon} />
-              <input 
-                type="text" 
-                placeholder="Search users..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={studentsStyles.searchInput}
-              />
-            </div>
-            
-            <div className={studentsStyles.filterGroup}>
-              <Filter size={18} />
-              <select 
-                value={roleFilter} 
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className={studentsStyles.filterSelect}
-              >
-                <option value="all">All Roles</option>
-                <option value="student">Students</option>
-                <option value="instructor">Instructors</option>
-              </select>
-            </div>
-          </div>
+            {error && (
+              <div className="au-alert">
+                <span>{error}</span>
+                <button className="au-alert-btn" onClick={fetchUsers}>
+                  {t('adminUsers.retry')}
+                </button>
+              </div>
+            )}
 
-          {/* Users Table */}
-          <div className={styles.card}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Joined</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.length > 0 ? (
-                  filteredUsers
-                    .filter(user => user.role !== 'Admin') // Hide admin users
-                    .map((user) => (
+            <div className="au-controls">
+              <div className="au-controls-row">
+                <div className="au-search">
+                  <Search size={18} className="au-search-icon" />
+                  <input
+                    type="text"
+                    placeholder={t('adminUsers.searchPlaceholder')}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="au-search-input"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="au-table-card">
+              <table className="au-table">
+                <thead>
+                  <tr>
+                    <th>
+                      <button
+                        type="button"
+                        onClick={() => toggleSort('name')}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}
+                      >
+                        {t('adminUsers.columnUser')} {sortIcon('name')}
+                      </button>
+                    </th>
+                    <th>
+                      <button
+                        type="button"
+                        onClick={() => toggleSort('email')}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}
+                      >
+                        {t('adminUsers.columnEmail')} {sortIcon('email')}
+                      </button>
+                    </th>
+                    <th>
+                      <button
+                        type="button"
+                        onClick={() => toggleSort('role')}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}
+                      >
+                        {t('adminUsers.columnRole')} {sortIcon('role')}
+                      </button>
+                    </th>
+                    <th>{t('adminUsers.columnStatus')}</th>
+                    <th>
+                      <button
+                        type="button"
+                        onClick={() => toggleSort('joined')}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}
+                      >
+                        {t('adminUsers.columnJoined')} {sortIcon('joined')}
+                      </button>
+                    </th>
+                    <th>{t('adminUsers.columnActions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedUsers.length > 0 ? (
+                    sortedUsers.map((user) => (
                       <tr key={user.id}>
                         <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <img 
-                              src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'user')}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                          <div className="au-user-cell">
+                            <img
+                              src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'user')}&backgroundColor=b6e3f4,c0aede,d1d4f9`}
                               alt={user.name}
                               style={{
                                 width: '40px',
@@ -430,47 +849,46 @@ const Users = () => {
                                 objectFit: 'cover',
                               }}
                             />
-                            <span style={{ fontWeight: '500' }}>{user.name}</span>
+                            <span className="au-user-name">{user.name}</span>
                           </div>
                         </td>
-                        <td style={{ color: '#64748b' }}>{user.email}</td>
+                        <td className="au-muted">{user.email}</td>
                         <td>
                           <span className={`${styles.badge} ${getRoleBadgeClass(user.role)}`}>
-                            {user.role}
+                            {t(`roles.${user.role}`)}
                           </span>
                         </td>
                         <td>
                           <span className={`${styles.badge} ${user.isActive ? styles.success : styles.warning}`}>
-                            {user.status}
+                            {t(`status.${user.status}`)}
                           </span>
                         </td>
-                        <td style={{ color: '#64748b' }}>{user.joined}</td>
+                        <td className="au-muted">{user.joined}</td>
                         <td>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            {/* Toggle Active/Inactive Button */}
-                            <button 
-                              className={studentsStyles.actionBtn}
-                              title={user.isActive ? 'Deactivate User' : 'Activate User'}
+                          <div className="au-actions">
+                            <button
+                              className="au-action-btn"
+                              title={user.isActive ? t('adminUsers.deactivateUser') : t('adminUsers.activateUser')}
                               onClick={() => handleToggleStatus(user.id, user.isActive)}
                               disabled={togglingId === user.id}
                               style={{
-                                backgroundColor: user.isActive 
-                                  ? 'rgba(34, 197, 94, 0.1)' 
+                                backgroundColor: user.isActive
+                                  ? 'rgba(34, 197, 94, 0.1)'
                                   : 'rgba(249, 115, 22, 0.1)',
-                                color: user.isActive ? '#22c55e' : '#f97316',
+                                color: user.isActive ? 'var(--green)' : 'var(--orange)',
                                 border: '1px solid',
-                                borderColor: user.isActive 
-                                  ? 'rgba(34, 197, 94, 0.2)' 
+                                borderColor: user.isActive
+                                  ? 'rgba(34, 197, 94, 0.2)'
                                   : 'rgba(249, 115, 22, 0.2)',
                                 opacity: togglingId === user.id ? 0.7 : 1,
                                 cursor: togglingId === user.id ? 'wait' : 'pointer'
                               }}
                             >
                               {togglingId === user.id ? (
-                                <span style={{ 
-                                  display: 'inline-block', 
-                                  width: '16px', 
-                                  height: '16px', 
+                                <span style={{
+                                  display: 'inline-block',
+                                  width: '16px',
+                                  height: '16px',
                                   border: '2px solid currentColor',
                                   borderTopColor: 'transparent',
                                   borderRadius: '50%',
@@ -483,12 +901,10 @@ const Users = () => {
                               )}
                             </button>
 
-
-                            {/* Delete Button - Hidden for admin users */}
                             {user.role !== 'Admin' && (
-                              <button 
-                                className={studentsStyles.actionBtn} 
-                                title="Delete User"
+                              <button
+                                className="au-action-btn"
+                                title={t('adminUsers.deleteUser')}
                                 onClick={() => handleDeleteUser(user.id)}
                                 style={{ color: '#ef4444' }}
                               >
@@ -499,17 +915,25 @@ const Users = () => {
                         </td>
                       </tr>
                     ))
-                ) : (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-                      No users found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="au-empty">
+                        {t('adminUsers.noUsers')}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div ref={loadMoreRef} style={{ height: 1 }} />
+            {loadingMore && (
+              <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                {t('adminUsers.loadingMore')}
+              </div>
+            )}
           </div>
-        </main>
+        </div>
       </div>
 
       {/* Add User Modal */}
@@ -520,21 +944,23 @@ const Users = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: 'rgba(15, 15, 26, 0.6)',
+          backdropFilter: 'blur(6px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--bg-card-solid)',
             borderRadius: '12px',
             padding: '2rem',
             width: '90%',
             maxWidth: '500px',
             maxHeight: '90vh',
             overflow: 'auto',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+            border: '1px solid var(--border-light)'
           }}>
             <div style={{
               display: 'flex',
@@ -542,7 +968,7 @@ const Users = () => {
               alignItems: 'center',
               marginBottom: '1.5rem'
             }}>
-              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '600' }}>Add New User</h2>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '600', color: 'var(--text-primary)' }}>{t('adminUsers.addModalTitle')}</h2>
               <button
                 onClick={() => {
                   setShowAddModal(false);
@@ -551,6 +977,7 @@ const Users = () => {
                     firstName: '',
                     lastName: '',
                     email: '',
+                    gender: '',
                     role: 'student',
                     password: '',
                     isActive: true
@@ -566,18 +993,18 @@ const Users = () => {
                   justifyContent: 'center'
                 }}
               >
-                <X size={20} color="#64748b" />
+                <X size={20} color="var(--text-muted)" />
               </button>
             </div>
 
             {addError && (
               <div style={{
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fee2e2',
+                backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
                 borderRadius: '8px',
                 padding: '0.75rem',
                 marginBottom: '1rem',
-                color: '#dc2626',
+                color: '#ef4444',
                 fontSize: '0.875rem'
               }}>
                 {addError}
@@ -591,9 +1018,9 @@ const Users = () => {
                   marginBottom: '0.5rem',
                   fontSize: '0.875rem',
                   fontWeight: '500',
-                  color: '#374151'
+                  color: 'var(--text-secondary)'
                 }}>
-                  First Name *
+                  {t('adminUsers.firstName')} *
                 </label>
                 <input
                   type="text"
@@ -603,9 +1030,11 @@ const Users = () => {
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    border: '1px solid #d1d5db',
+                    border: '1px solid var(--border-light)',
                     borderRadius: '8px',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    backgroundColor: 'var(--bg-card-solid)',
+                    color: 'var(--text-primary)'
                   }}
                 />
               </div>
@@ -616,9 +1045,9 @@ const Users = () => {
                   marginBottom: '0.5rem',
                   fontSize: '0.875rem',
                   fontWeight: '500',
-                  color: '#374151'
+                  color: 'var(--text-secondary)'
                 }}>
-                  Last Name *
+                  {t('adminUsers.lastName')} *
                 </label>
                 <input
                   type="text"
@@ -628,9 +1057,11 @@ const Users = () => {
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    border: '1px solid #d1d5db',
+                    border: '1px solid var(--border-light)',
                     borderRadius: '8px',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    backgroundColor: 'var(--bg-card-solid)',
+                    color: 'var(--text-primary)'
                   }}
                 />
               </div>
@@ -641,9 +1072,9 @@ const Users = () => {
                   marginBottom: '0.5rem',
                   fontSize: '0.875rem',
                   fontWeight: '500',
-                  color: '#374151'
+                  color: 'var(--text-secondary)'
                 }}>
-                  Email *
+                  {t('adminUsers.email')} *
                 </label>
                 <input
                   type="email"
@@ -653,9 +1084,11 @@ const Users = () => {
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    border: '1px solid #d1d5db',
+                    border: '1px solid var(--border-light)',
                     borderRadius: '8px',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    backgroundColor: 'var(--bg-card-solid)',
+                    color: 'var(--text-primary)'
                   }}
                 />
               </div>
@@ -666,26 +1099,29 @@ const Users = () => {
                   marginBottom: '0.5rem',
                   fontSize: '0.875rem',
                   fontWeight: '500',
-                  color: '#374151'
+                  color: 'var(--text-secondary)'
                 }}>
-                  Role *
+                  {t('adminUsers.gender')} *
                 </label>
                 <select
-                  value={newUser.role}
-                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                  value={newUser.gender}
+                  onChange={(e) => setNewUser({ ...newUser, gender: e.target.value })}
                   required
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    border: '1px solid #d1d5db',
+                    border: '1px solid var(--border-light)',
                     borderRadius: '8px',
                     fontSize: '0.875rem',
-                    backgroundColor: 'white'
+                    backgroundColor: 'var(--bg-card-solid)',
+                    color: 'var(--text-primary)'
                   }}
                 >
-                  <option value="student">Student</option>
-                  <option value="instructor">Instructor</option>
-                  <option value="admin">Admin</option>
+                  <option value="" disabled>{t('adminUsers.genderSelect')}</option>
+                  <option value="female">{t('adminUsers.genderFemale')}</option>
+                  <option value="male">{t('adminUsers.genderMale')}</option>
+                  <option value="non-binary">{t('adminUsers.genderNonBinary')}</option>
+                  <option value="prefer-not-to-say">{t('adminUsers.genderPreferNot')}</option>
                 </select>
               </div>
 
@@ -695,21 +1131,53 @@ const Users = () => {
                   marginBottom: '0.5rem',
                   fontSize: '0.875rem',
                   fontWeight: '500',
-                  color: '#374151'
+                  color: 'var(--text-secondary)'
                 }}>
-                  Password (leave empty to auto-generate)
+                  {t('adminUsers.role')} *
+                </label>
+                <select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid var(--border-light)',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'var(--bg-card-solid)',
+                    color: 'var(--text-primary)'
+                  }}
+                >
+                  <option value="student">{t('adminUsers.roleStudent')}</option>
+                  <option value="instructor">{t('adminUsers.roleInstructor')}</option>
+                  <option value="admin">{t('adminUsers.roleAdmin')}</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: 'var(--text-secondary)'
+                }}>
+                  {t('adminUsers.passwordLabel')}
                 </label>
                 <input
                   type="text"
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  placeholder="Auto-generate if empty"
+                  placeholder={t('adminUsers.passwordPlaceholder')}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    border: '1px solid #d1d5db',
+                    border: '1px solid var(--border-light)',
                     borderRadius: '8px',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    backgroundColor: 'var(--bg-card-solid)',
+                    color: 'var(--text-primary)'
                   }}
                 />
                 <button
@@ -718,14 +1186,15 @@ const Users = () => {
                   style={{
                     marginTop: '0.5rem',
                     padding: '0.5rem 1rem',
-                    backgroundColor: '#f3f4f6',
-                    border: '1px solid #d1d5db',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-light)',
                     borderRadius: '6px',
                     fontSize: '0.75rem',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)'
                   }}
                 >
-                  Generate Password
+                  {t('adminUsers.generatePassword')}
                 </button>
               </div>
 
@@ -735,7 +1204,8 @@ const Users = () => {
                   alignItems: 'center',
                   gap: '0.5rem',
                   fontSize: '0.875rem',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
                 }}>
                   <input
                     type="checkbox"
@@ -743,10 +1213,9 @@ const Users = () => {
                     onChange={(e) => setNewUser({ ...newUser, isActive: e.target.checked })}
                     style={{ cursor: 'pointer' }}
                   />
-                  <span>Account Active</span>
+                  <span>{t('adminUsers.accountActive')}</span>
                 </label>
               </div>
-
               <div style={{
                 display: 'flex',
                 gap: '0.75rem',
@@ -761,6 +1230,7 @@ const Users = () => {
                       firstName: '',
                       lastName: '',
                       email: '',
+                      gender: '',
                       role: 'student',
                       password: '',
                       isActive: true
@@ -768,23 +1238,23 @@ const Users = () => {
                   }}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    backgroundColor: '#f3f4f6',
-                    border: 'none',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-light)',
                     borderRadius: '8px',
                     fontSize: '0.875rem',
                     fontWeight: '500',
                     cursor: 'pointer',
-                    color: '#374151'
+                    color: 'var(--text-secondary)'
                   }}
                 >
-                  Cancel
+                  {t('adminUsers.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={addingUser}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    backgroundColor: addingUser ? '#9ca3af' : '#E31837',
+                    backgroundColor: addingUser ? '#9ca3af' : 'var(--primary)',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '0.875rem',
@@ -793,14 +1263,14 @@ const Users = () => {
                     color: 'white'
                   }}
                 >
-                  {addingUser ? 'Creating...' : 'Create User'}
+                  {addingUser ? t('adminUsers.creating') : t('adminUsers.createUser')}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
