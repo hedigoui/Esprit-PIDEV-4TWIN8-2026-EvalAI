@@ -7,9 +7,24 @@ module.exports = {
   },
   collectCoverageFrom: [
     '**/*.(t|j)s',
+    '!**/*.spec.ts',
+    '!**/*.module.ts',
   ],
   coverageDirectory: '../coverage',
-  coverageReporters: ['text', 'text-summary', 'html', 'lcov', 'json'],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    '/coverage/',
+  ],
+  coverageReporters: ['text', 'text-summary', 'html', 'lcov', 'json', 'cobertura'],
+  coverageThreshold: {
+    global: {
+      branches: 10,
+      functions: 2,
+      lines: 10,
+      statements: 10,
+    },
+  },
   testEnvironment: 'node',
   reporters: [
     'default',
