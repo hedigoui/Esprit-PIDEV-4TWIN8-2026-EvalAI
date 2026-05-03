@@ -3,10 +3,11 @@ import AdminSidebar from '../../components/AdminSidebar';
 import { Shield, Database, Bell, Globe, Lock, Server } from 'lucide-react';
 import styles from '../../styles/shared.module.css';
 import settingsStyles from '../student/Settings.module.css';
-import { getStoredTheme, setStoredTheme } from '../../theme';
+import { getStoredTheme, setStoredTheme, getStoredIntensity, setStoredIntensity } from '../../theme';
 
 const Settings = () => {
   const [darkMode, setDarkMode] = useState(() => getStoredTheme() === 'dark');
+  const [darkIntensity, setDarkIntensity] = useState(() => getStoredIntensity());
 
   return (
     <div className={styles.layout}>
@@ -71,6 +72,27 @@ const Settings = () => {
                   <span className={settingsStyles.slider}></span>
                 </label>
               </div>
+
+              {darkMode && (
+                <div className={settingsStyles.formGroup} style={{ marginTop: '1rem', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span>Darkness Degree</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{darkIntensity}%</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={darkIntensity}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setDarkIntensity(val);
+                      setStoredIntensity(val);
+                    }}
+                    style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                  />
+                </div>
+              )}
 
               <button className={styles.primaryButton}>Save Changes</button>
             </div>

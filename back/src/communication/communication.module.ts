@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { CommunicationController } from './communication.controller';
 import { CommunicationService } from './communication.service';
+import { ExamGateway } from './exam.gateway';
 import {
   Message,
   Conversation,
@@ -27,7 +28,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
     }),
   ],
   controllers: [CommunicationController],
-  providers: [CommunicationService, JwtAuthGuard],
+  providers: [CommunicationService, JwtAuthGuard, ExamGateway],
   exports: [CommunicationService],
 })
 export class CommunicationModule {}

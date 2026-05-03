@@ -103,7 +103,7 @@ export class EvaluationService {
         let assemblyResult;
         try {
           assemblyResult =
-            await this.assemblyAIService.evaluateAudio(audioBuffer);
+            await this.assemblyAIService.evaluateAudio(audioBuffer, language);
           this.logger.log('✅ AssemblyAI response received');
           this.logger.log(`   Transcript length: ${assemblyResult.transcript?.length || 0} characters`);
         } catch (assemblyError) {

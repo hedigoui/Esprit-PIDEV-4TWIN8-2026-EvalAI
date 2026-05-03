@@ -54,10 +54,10 @@
 
 /* Dark mode (toggled in Settings; `data-theme` set on <html> via theme.js) */
 [data-theme='dark'] {
-  --bg-main: #0b0b12;
-  --bg-card: rgba(24, 24, 38, 0.88);
-  --bg-card-solid: #181826;
-  --bg-glass: rgba(24, 24, 38, 0.65);
+  --bg-main: color-mix(in srgb, #0b0b12, #000000 var(--dark-intensity, 0%));
+  --bg-card: color-mix(in srgb, rgba(24, 24, 38, 0.88), rgba(0, 0, 0, 0.88) var(--dark-intensity, 0%));
+  --bg-card-solid: color-mix(in srgb, #181826, #000000 var(--dark-intensity, 0%));
+  --bg-glass: color-mix(in srgb, rgba(24, 24, 38, 0.65), rgba(0, 0, 0, 0.65) var(--dark-intensity, 0%));
 
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
@@ -123,3 +123,5 @@ a {
   width: 100%;
   min-height: 100vh;
 }
+
+@keyframes spin { 100% { transform: rotate(360deg); } }

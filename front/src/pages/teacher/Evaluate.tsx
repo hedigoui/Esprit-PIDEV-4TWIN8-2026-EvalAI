@@ -3,10 +3,11 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import TeacherSidebar from '../../components/TeacherSidebar';
 import AiDisclosureNotice from '../../components/AiDisclosureNotice';
-import { Upload, Play, Pause, Send, Bot, User, Mic, MicOff, CheckCircle, XCircle, Loader, RotateCcw, Sparkles } from 'lucide-react';
+import { Upload, Play, Pause, Send, Bot, User, Mic, MicOff, CheckCircle, XCircle, Loader, RotateCcw, Sparkles, MonitorPlay } from 'lucide-react';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import { useEvaluation } from '../../hooks/useEvaluation';
 import { oralPerformanceService } from '../services/oralPerformance.service';
+import { useSocket } from '../../context/SocketContext';
 
 // Import CSS modules
 // @ts-ignore - CSS module typing is not picked up by current TS project config
@@ -141,6 +142,22 @@ const Evaluate: React.FC = () => {
   
   const [cefrLevel, setCefrLevel] = useState<string>('B2');
   const [notes, setNotes] = useState<string>('');
+  
+  const { socket } = useSocket();
+
+  const handleOnlineExam = () => {
+    if (!socket || !instructorId || !effectiveStudentId) {
+      alert("Please select a student first.");
+      return;
+    }
+    const roomId = `exam_${Math.random().toString(36).substr(2, 9)}`;
+    socket.emit('sendExamInvite', {
+      teacherId: instructorId,
+      studentId: effectiveStudentId,
+      roomId
+    });
+    navigate(`/teacher/exam-room/${roomId}`);
+  };
 
 
 useEffect(() => {
@@ -207,7 +224,10 @@ useEffect(() => {
     if (performance?._id) {
       fetchEvaluation();
     }
-  }, [performance?._id]);
+    if (performance?.audioFile) {
+      setShowEvaluationForm(true);
+    }
+  }, [performance?._id, performance?.audioFile]);
 
   const performanceHasSavedInstructorScores = (p: Performance | null): boolean => {
     if (!p?.scores) return false;
@@ -696,7 +716,7 @@ useEffect(() => {
                 {evaluateeProfile?.email ? evaluateeProfile.email : ''}
               </p>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', paddingRight: '140px' }}>
               <button
                 type="button"
                 className={secondaryButtonClass}
@@ -716,13 +736,25 @@ useEffect(() => {
                   {isLoading || isEvaluating ? 'Evaluating...' : 'Start AI Evaluation'}
                 </button>
               )}
+              {effectiveStudentId && (
+                <button 
+                  type="button"
+                  className={primaryButtonClass}
+                  onClick={handleOnlineExam}
+                  style={{ background: '#4f46e5', border: 'none' }}
+                  title="Invite this student to a live online exam room"
+                >
+                  <MonitorPlay size={18} />
+                  Invite to Online Exam
+                </button>
+              )}
             </div>
           </div>
 
           <AiDisclosureNotice />
 
           {/* Student Search Section */}
-          {!selectedStudent && (
+          {!effectiveStudentId && (
             <div style={{
               background: '#f0f9ff',
               border: '2px solid #0284c7',
@@ -803,7 +835,7 @@ useEffect(() => {
           )}
 
           {/* Selected Student Display */}
-          {selectedStudent && (
+          {effectiveStudentId && evaluateeProfile && (
             <div style={{
               background: '#dcfce7',
               border: '2px solid #22c55e',
@@ -817,9 +849,9 @@ useEffect(() => {
               <div>
                 <strong style={{ color: '#166534' }}>Selected Student:</strong>
                 <div style={{ color: '#15803d' }}>
-                  {selectedStudent.firstName} {selectedStudent.lastName}
+                  {evaluateeProfile.firstName} {evaluateeProfile.lastName}
                 </div>
-                <small style={{ color: '#4b5563' }}>{selectedStudent.email}</small>
+                <small style={{ color: '#4b5563' }}>{evaluateeProfile.email}</small>
               </div>
               <button
                 onClick={() => {
@@ -947,7 +979,7 @@ useEffect(() => {
           )}
 
           {/* Only show recording interface when a student is selected */}
-          {!selectedStudent && (
+          {!effectiveStudentId && (
             <div style={{
               textAlign: 'center',
               padding: '3rem 1rem',
@@ -959,7 +991,7 @@ useEffect(() => {
             </div>
           )}
 
-          {selectedStudent && (
+          {effectiveStudentId && (
           <div className={evaluateStyles?.evaluateGrid || 'evaluate-grid'}>
             {/* Left: Video/Audio Player */}
             <div className={evaluateStyles?.leftColumn || 'left-column'}>
@@ -1157,6 +1189,7 @@ useEffect(() => {
                         >
                           <option value="en">English</option>
                           <option value="fr">French (Français)</option>
+                          <option value="ar">Arabic (العربية)</option>
                         </select>
                       </div>
                       <div className={evaluateStyles?.formGroup || 'form-group'}>

@@ -307,7 +307,7 @@ DELIVERY METRICS (from automatic audio analysis — use these to align your CEFR
   private buildPrompt(
     transcript: string,
     subject: string,
-    language: 'en' | 'fr',
+    language: 'en' | 'fr' | 'ar' | string,
     mode: 'strict' | 'encouraging',
     speechMetrics?: SpeechMetrics,
   ): string {
@@ -353,6 +353,37 @@ QUALITÉ DU COMMENTAIRE (pour les enseignants) — utilise les champs JSON angla
 - detailedFeedback: structure, lacunes, suggestions de vocabulaire — toujours liés à ce que l'apprenant a dit.
 
 Retourne UNIQUEMENT ce JSON (clés en anglais comme ci-dessous):
+{
+  "scores": { "contentStructure": number, "coherence": number, "topicRelevance": number, "grammar": number, "vocabulary": number },
+  "analysis": { "summary": "string", "keyPoints": ["string"], "strengths": ["string"], "improvements": ["string"], "cefrLevel": "B1" },
+  "detailedFeedback": { "structure": "string", "contentGaps": ["string"], "vocabularySuggestions": ["string"] }
+}`;
+    }
+
+    if (language === 'ar') {
+      return `أنت خبير في تقييم اللغة لمتعلمي اللغة العربية.
+
+${scoringGuide}
+
+الموضوع: "${subject}"
+النص الصوتي للطالب: "${transcript}"
+${metricsBlock}
+
+قيّم بناءً على هذه المعايير (0-100):
+
+1. contentStructure: التنظيم (المقدمة، العرض، الخاتمة)
+2. coherence: التسلسل المنطقي للأفكار
+3. topicRelevance: مدى ارتباط الإجابة بالموضوع
+4. grammar: الدقة النحوية
+5. vocabulary: اختيار الكلمات وتنوعها
+
+جودة التعليقات (للمعلمين) — استخدم حقول JSON باللغة الإنجليزية كما هو موضح أدناه:
+- summary: جملتان إلى 4 جمل تلخص ما قاله الطالب باللغة الإنجليزية.
+- keyPoints: 4 إلى 6 نقاط مستمدة من النص باللغة الإنجليزية.
+- strengths / improvements: نقاط القوة والضعف باللغة الإنجليزية.
+- detailedFeedback: ملاحظات مفصلة باللغة الإنجليزية.
+
+يجب أن يكون الإخراج بصيغة JSON فقط:
 {
   "scores": { "contentStructure": number, "coherence": number, "topicRelevance": number, "grammar": number, "vocabulary": number },
   "analysis": { "summary": "string", "keyPoints": ["string"], "strengths": ["string"], "improvements": ["string"], "cefrLevel": "B1" },

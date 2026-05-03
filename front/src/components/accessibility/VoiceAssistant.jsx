@@ -1,10 +1,33 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Mic, MicOff } from 'lucide-react';
+import { useAccessibilitySettings } from '../../hooks/useAccessibilitySettings';
 
-// Normalize voice input - improved with better whitespace and number handling
+// Levenshtein Distance for fuzzy matching
+const levenshteinDistance = (a, b) => {
+  const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+  return matrix[a.length][b.length];
+};
+
+// Normalize voice input - with phonetic replacements
 const normalizeVoiceInput = (text) => {
-  return text
+  let normalized = text
     .toLowerCase()
     .trim()
     .replace(/\s+at\s+/gi, ' at ')
@@ -12,19 +35,73 @@ const normalizeVoiceInput = (text) => {
     .replace(/[^\w\s@.]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+    
+  // Phonetic/misheard fixes specific to our app vocabulary
+  const fixes = {
+    'locking': 'login',
+    'leg in': 'login',
+    'log in': 'login',
+    'dust board': 'dashboard',
+    'dash bird': 'dashboard',
+    'dash board': 'dashboard',
+    'a valuate': 'evaluate',
+    'evalue': 'evaluate',
+    'eve you': 'evaluate',
+    'eval you': 'evaluate',
+    'ad min': 'admin',
+    'at min': 'admin',
+    'two dents': 'students',
+    'student': 'students',
+    'seating': 'settings',
+    'setting': 'settings',
+    'sitting': 'settings'
+  };
+
+  for (const [wrong, right] of Object.entries(fixes)) {
+    if (normalized.includes(wrong)) {
+      normalized = normalized.replace(new RegExp(`\\b${wrong}\\b`, 'g'), right);
+    }
+  }
+
+  return normalized;
 };
 
-// Enhanced command matcher with confidence levels
+// Enhanced command matcher with fuzzy matching
 const matchCommand = (transcript, patterns) => {
   const t = normalizeVoiceInput(transcript);
   
-  // High confidence: exact match
+  // 1. High confidence: exact match or regex
   for (const pattern of patterns) {
     if (typeof pattern === 'string' && (t === pattern || t.endsWith(' ' + pattern) || t.startsWith(pattern + ' '))) {
       return { match: true, confidence: 1.0, normalized: t };
     }
     if (pattern instanceof RegExp && pattern.test(t)) {
       return { match: true, confidence: 0.95, normalized: t };
+    }
+  }
+  
+  // 2. Fuzzy match: Check if any string pattern is very close to the transcript
+  for (const pattern of patterns) {
+    if (typeof pattern === 'string') {
+      const distance = levenshteinDistance(t, pattern);
+      // Allow 1 typo for short words (< 5), 2 for medium (< 10), 3 for long
+      const allowedDistance = pattern.length < 5 ? 1 : pattern.length < 10 ? 2 : 3;
+      
+      if (distance <= allowedDistance) {
+        return { match: true, confidence: 0.8, normalized: pattern }; // return the pattern it matched
+      }
+      
+      // Also check if the pattern is fuzzy-contained within the transcript
+      const words = t.split(' ');
+      const patternWords = pattern.split(' ');
+      
+      if (patternWords.length === 1) {
+         for (const word of words) {
+           if (levenshteinDistance(word, pattern) <= allowedDistance) {
+             return { match: true, confidence: 0.7, normalized: t };
+           }
+         }
+      }
     }
   }
   
@@ -43,6 +120,7 @@ const isUserLoggedIn = () => {
 };
 
 const VoiceAssistant = () => {
+  const { settings, loaded, updateSetting } = useAccessibilitySettings();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -51,6 +129,7 @@ const VoiceAssistant = () => {
   const [lastTranscript, setLastTranscript] = useState('');
   const recognitionRef = useRef(null);
   const currentFieldRef = useRef(null);
+  const retryCountRef = useRef(0);
 
   // Helper to set input value and trigger React's onChange properly
   const setInputValue = (inputElement, newValue) => {
@@ -316,9 +395,9 @@ const VoiceAssistant = () => {
     [navigate, speak, location.pathname]
   );
 
-  // Initialize speech recognition with audio constraints (improved from useAudioRecorder pattern)
+  // Initialize speech recognition
   useEffect(() => {
-    console.log('[Voice] Initializing with audio constraints...');
+    console.log('[Voice] Initializing speech recognition...');
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
@@ -329,22 +408,6 @@ const VoiceAssistant = () => {
     setSupported(true);
 
     try {
-      // Request microphone access with quality constraints (same as useAudioRecorder)
-      navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        }
-      }).then((stream) => {
-        // Stop the stream immediately - we only use it to enable constraints for Speech Recognition
-        stream.getTracks().forEach(track => track.stop());
-        console.log('[Voice] Audio constraints enabled');
-      }).catch((error) => {
-        console.warn('[Voice] Audio constraints support:', error.message);
-        // Continue anyway - Speech Recognition will work without explicit constraints
-      });
-
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = false;
@@ -352,6 +415,7 @@ const VoiceAssistant = () => {
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
+        retryCountRef.current = 0; // Reset retry counter on successful start
         setListening(true);
         console.log('[Voice] Listening started');
       };
@@ -364,17 +428,16 @@ const VoiceAssistant = () => {
           
           console.log('[Voice] Result:', transcript, 'Confidence:', confidence.toFixed(2));
           
-          // Lower threshold for email/password (longer utterances have lower confidence naturally)
-          // Commands: require 0.5, but email/password: accept anything > 0.1
+          // More lenient confidence thresholds
           const isInInputMode = currentFieldRef.current === 'email' || currentFieldRef.current === 'password';
-          const minConfidence = isInInputMode ? 0.1 : 0.5;
+          const minConfidence = isInInputMode ? 0.3 : 0.4; // Lowered from 0.1 and 0.5
           
-          if (confidence >= minConfidence || transcript.trim().length > 0) {
+          // Always process if we have a transcript, regardless of confidence
+          if (transcript && transcript.trim().length > 0) {
             setLastTranscript(transcript);
             parseAndRun(transcript);
           } else {
-            console.log('[Voice] Low confidence result, ignoring');
-            speak('Sorry, I did not hear that clearly. Please try again.');
+            console.log('[Voice] Empty transcript, ignoring');
           }
         }
       };
@@ -383,10 +446,36 @@ const VoiceAssistant = () => {
         console.error('[Voice] Error:', event.error);
         setListening(false);
         
+        // Handle network errors with retry logic
+        if (event.error === 'network') {
+          retryCountRef.current = (retryCountRef.current || 0) + 1;
+          console.log('[Voice] Network error, retry attempt:', retryCountRef.current);
+          
+          if (retryCountRef.current < 3) {
+            // Retry after 500ms
+            setTimeout(() => {
+              console.log('[Voice] Retrying speech recognition...');
+              if (recognitionRef.current) {
+                try {
+                  recognitionRef.current.start();
+                } catch (e) {
+                  console.warn('[Voice] Retry start error:', e.message);
+                }
+              }
+            }, 500);
+            return;
+          } else {
+            speak('Network connection issue. Please check your connection and try again.');
+            retryCountRef.current = 0;
+            return;
+          }
+        }
+        
+        retryCountRef.current = 0;
+        
         // Provide user feedback for different errors
         const errorMessages = {
           'no-speech': 'No speech detected. Please try again.',
-          'network': 'Network error. Please check your connection.',
           'audio-capture': 'No microphone found. Please check permissions.',
           'permission-denied': 'Microphone permission denied.',
         };
@@ -428,12 +517,12 @@ const VoiceAssistant = () => {
     setLastTranscript('');
     try {
       recognitionRef.current.start();
-      // Auto-stop after 15 seconds (safety timeout)
+      // Auto-stop after 30 seconds (increased from 15 for longer utterances)
       const timeout = setTimeout(() => {
         if (recognitionRef.current) {
           recognitionRef.current.stop();
         }
-      }, 15000);
+      }, 30000);
       
       // Store timeout so we can clear it when done
       recognitionRef.current._autoStopTimeout = timeout;
@@ -444,7 +533,17 @@ const VoiceAssistant = () => {
 
   const toggleListening = () => {
     if (!supported || !recognitionRef.current) return;
-    // Just start - it will auto-stop after speech is recognized
+
+    if (listening) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.warn(e);
+      }
+      return;
+    }
+
+    // Just start listening - don't update parent state
     startListening();
   };
 
@@ -466,6 +565,10 @@ const VoiceAssistant = () => {
         Voice not supported. Try Chrome or Edge.
       </div>
     );
+  }
+
+  if (loaded && !settings.voiceControlEnabled) {
+    // We don't return null anymore. We show it disabled, allowing the user to click it to re-enable.
   }
 
   return (
@@ -512,6 +615,7 @@ const VoiceAssistant = () => {
       )}
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()} // CRITICAL: Prevent button from stealing focus from the input field
         onClick={toggleListening}
         aria-label={listening ? 'Stop listening' : 'Start voice assistant'}
         title={listening ? 'Stop' : 'Voice assistant'}
@@ -520,7 +624,7 @@ const VoiceAssistant = () => {
           height: 56,
           borderRadius: '50%',
           border: 'none',
-          background: listening ? '#c41230' : '#E31837',
+          background: !settings.voiceControlEnabled ? '#64748b' : listening ? '#c41230' : '#E31837',
           color: '#fff',
           cursor: 'pointer',
           display: 'flex',
@@ -530,7 +634,7 @@ const VoiceAssistant = () => {
           transition: 'background-color 0.2s',
         }}
       >
-        {listening ? <MicOff size={24} /> : <Mic size={24} />}
+        {!settings.voiceControlEnabled || listening ? <MicOff size={24} /> : <Mic size={24} />}
       </button>
     </div>
   );

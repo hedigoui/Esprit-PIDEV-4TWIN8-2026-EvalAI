@@ -9,6 +9,7 @@ export interface AccessibilitySettings {
   screenReaderOptimized: boolean;
   voiceControlEnabled: boolean;
   keyboardNavigationEnabled: boolean;
+  selectionReaderEnabled: boolean;
   colorBlindMode: 'none' | 'deuteranopia' | 'protanopia' | 'tritanopia';
 }
 
@@ -21,6 +22,7 @@ const DEFAULT_SETTINGS: AccessibilitySettings = {
   screenReaderOptimized: false,
   voiceControlEnabled: true,
   keyboardNavigationEnabled: true,
+  selectionReaderEnabled: true,
   colorBlindMode: 'none',
 };
 
@@ -56,9 +58,9 @@ export const useAccessibilitySettings = () => {
     
     // Font size
     const fontSizeMap = {
-      normal: '1rem',
-      large: '1.25rem',
-      'extra-large': '1.5rem',
+      normal: '100%',
+      large: '125%',
+      'extra-large': '150%',
     };
     root.style.setProperty('--a11y-font-size', fontSizeMap[settings.fontSize]);
 
@@ -93,7 +95,12 @@ export const useAccessibilitySettings = () => {
 
   const updateSetting = useCallback(
     <K extends keyof AccessibilitySettings>(key: K, value: AccessibilitySettings[K]) => {
-      setSettings((prev) => ({ ...prev, [key]: value }));
+      setSettings((prev) => {
+        const next = { ...prev, [key]: value };
+        // Dispatch event to sync state across all hook instances
+        window.dispatchEvent(new CustomEvent('a11y-settings-sync', { detail: next }));
+        return next;
+      });
     },
     []
   );
@@ -101,6 +108,17 @@ export const useAccessibilitySettings = () => {
   const resetSettings = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
     localStorage.removeItem(STORAGE_KEY);
+    window.dispatchEvent(new CustomEvent('a11y-settings-sync', { detail: DEFAULT_SETTINGS }));
+  }, []);
+
+  // Listen for sync events from other hook instances
+  useEffect(() => {
+    const handleSync = (e: CustomEvent<AccessibilitySettings>) => {
+      setSettings(e.detail);
+    };
+    
+    window.addEventListener('a11y-settings-sync', handleSync as EventListener);
+    return () => window.removeEventListener('a11y-settings-sync', handleSync as EventListener);
   }, []);
 
   return {
@@ -121,15 +139,18 @@ export const injectAccessibilityStyles = () => {
   style.id = 'a11y-styles';
   style.innerHTML = `
     :root {
-      --a11y-font-size: 1rem;
+      --a11y-font-size: 100%;
       --a11y-line-height: 1.5;
       --a11y-focus-color: #4A90E2;
       --a11y-focus-outline: 3px solid var(--a11y-focus-color);
     }
 
+    html {
+      font-size: var(--a11y-font-size) !important;
+    }
+
     /* Font size and spacing */
     body {
-      font-size: var(--a11y-font-size);
       line-height: var(--a11y-line-height);
     }
 
@@ -218,6 +239,32 @@ export const injectAccessibilityStyles = () => {
     }
   `;
   document.head.appendChild(style);
+};
+
+/**
+ * Inject the mathematical SVG matrices required for Color Blind CSS filters to actually work.
+ */
+export const injectColorBlindFilters = () => {
+  if (document.getElementById('a11y-color-blind-filters')) return;
+
+  const svg = document.createElement('div');
+  svg.id = 'a11y-color-blind-filters';
+  svg.innerHTML = `
+    <svg style="width: 0; height: 0; position: absolute; pointer-events: none;" aria-hidden="true">
+      <defs>
+        <filter id="deuteranopia">
+          <feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0"/>
+        </filter>
+        <filter id="protanopia">
+          <feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0"/>
+        </filter>
+        <filter id="tritanopia">
+          <feColorMatrix type="matrix" values="0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0"/>
+        </filter>
+      </defs>
+    </svg>
+  `;
+  document.body.appendChild(svg);
 };
 
 /**

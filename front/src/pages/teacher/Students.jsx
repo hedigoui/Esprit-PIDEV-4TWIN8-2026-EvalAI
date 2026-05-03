@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TeacherSidebar from '../../components/TeacherSidebar';
-import { Search, Filter, Eye, ClipboardCheck, MessageCircle, Users, TrendingUp, Calendar, Phone } from 'lucide-react';
+import { Search, Filter, Eye, ClipboardCheck, MessageCircle, Users, TrendingUp, Calendar, Phone, MonitorPlay } from 'lucide-react';
 import styles from '../../styles/shared.module.css';
 import { oralPerformanceService } from '../services/oralPerformance.service';
 import teacherStyles from './Teacher.module.css';
 import studentsStyles from './Students.module.css';
+import { useSocket } from '../../context/SocketContext';
 
 function normalizeDisplayScore(raw) {
   if (raw == null || Number.isNaN(Number(raw))) return null;
@@ -75,6 +76,7 @@ const Students = () => {
   const [performances, setPerformances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid');
+  const { socket } = useSocket();
 
   const currentUser = useMemo(() => {
     try {
@@ -134,6 +136,17 @@ const Students = () => {
 
   const startConversation = (studentId) => {
     navigate(`/messages/${studentId}`);
+  };
+
+  const handleOnlineExam = (studentId) => {
+    if (!socket || !currentUser) return;
+    const roomId = `exam_${Math.random().toString(36).substr(2, 9)}`;
+    socket.emit('sendExamInvite', {
+      teacherId: currentUser.id,
+      studentId,
+      roomId
+    });
+    navigate(`/teacher/exam-room/${roomId}`);
   };
 
   const getStatusColor = (status) => {
@@ -381,6 +394,15 @@ const Students = () => {
                         >
                           <MessageCircle size={16} />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOnlineExam(student._id)}
+                          className={studentsStyles.actionButton}
+                          style={{ background: '#e0e7ff', color: '#4f46e5', border: 'none' }}
+                          title="Invite to Online Exam"
+                        >
+                          <MonitorPlay size={16} />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -443,6 +465,15 @@ const Students = () => {
                           title="Message"
                         >
                           <MessageCircle size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOnlineExam(student._id)}
+                          className={studentsStyles.actionButton}
+                          style={{ background: '#e0e7ff', color: '#4f46e5', border: 'none' }}
+                          title="Invite to Online Exam"
+                        >
+                          <MonitorPlay size={16} />
                         </button>
                       </div>
                     </div>

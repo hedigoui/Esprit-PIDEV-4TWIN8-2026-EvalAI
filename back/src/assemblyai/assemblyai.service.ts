@@ -119,20 +119,23 @@ export class AssemblyAIService {
     return `AssemblyAI request failed${code ? ` (${code})` : ''}`;
   }
 
-  private async transcribeWithRetry(audioBuffer: Buffer): Promise<any> {
+  private async transcribeWithRetry(audioBuffer: Buffer, languageCode: string = 'en'): Promise<any> {
     let lastError: any;
+
+    // Map common ISO codes to AssemblyAI codes
+    const mappedLanguage = languageCode === 'en' ? 'en_us' : languageCode;
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         this.logger.log(
-          `AssemblyAI transcription attempt ${attempt}/${this.maxRetries}`,
+          `AssemblyAI transcription attempt ${attempt}/${this.maxRetries} with language: ${mappedLanguage}`,
         );
 
         return await this.client.transcripts.transcribe({
           audio: audioBuffer,
           speech_models: ['universal'],
-          language_detection: true,
-          language_code: null, // Let AssemblyAI auto-detect language
+          language_detection: false,
+          language_code: mappedLanguage as any,
           speaker_labels: true,
           sentiment_analysis: true,
           auto_chapters: true,
@@ -157,12 +160,29 @@ export class AssemblyAIService {
     );
   }
 
-  async evaluateAudio(audioBuffer: Buffer): Promise<EvaluationResult> {
-    this.logger.log('========== STARTING ASSEMBLYAI EVALUATION ==========');
+  async transcribeAudio(audioBuffer: Buffer, language: string = 'en'): Promise<string> {
+    this.logger.log(`========== STARTING QUICK TRANSCRIPTION (${language}) ==========`);
+    try {
+      const transcript = await this.transcribeWithRetry(audioBuffer, language);
+      
+      if (transcript.status === 'error') {
+        throw new Error(`Transcription failed: ${transcript.error}`);
+      }
+      
+      this.logger.log(`✅ Quick transcript received: "${transcript.text}"`);
+      return transcript.text || '';
+    } catch (error) {
+      this.logger.error(`❌ AssemblyAI quick transcription error: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async evaluateAudio(audioBuffer: Buffer, language: string = 'en'): Promise<EvaluationResult> {
+    this.logger.log(`========== STARTING ASSEMBLYAI EVALUATION (${language}) ==========`);
 
     try {
-      // Force English language and disable auto-detection
-      const transcript = await this.transcribeWithRetry(audioBuffer);
+      // Pass the language down to enforce correct transcription
+      const transcript = await this.transcribeWithRetry(audioBuffer, language);
 
       if (transcript.status === 'error') {
         throw new Error(`Transcription failed: ${transcript.error}`);

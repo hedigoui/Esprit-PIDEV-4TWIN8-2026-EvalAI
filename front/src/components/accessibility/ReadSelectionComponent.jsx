@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Volume2, Languages } from 'lucide-react';
+import { useAccessibilitySettings } from '../../hooks/useAccessibilitySettings';
 
 const TRANSLATION_LANGS = [
   { code: 'en', label: 'English', ttsLang: 'en-US' },
@@ -17,6 +18,7 @@ const MYMEMORY_API = 'https://api.mymemory.translated.net/get';
  */
 const ReadSelectionComponent = () => {
   const { t, i18n } = useTranslation();
+  const { settings, loaded } = useAccessibilitySettings();
   const [position, setPosition] = useState(null);
   const [selectedText, setSelectedText] = useState('');
   const [translateOpen, setTranslateOpen] = useState(false);
@@ -34,6 +36,12 @@ const ReadSelectionComponent = () => {
   }, []);
 
   const updateSelection = useCallback(() => {
+    // If disabled in settings, do not show selection popup
+    if (loaded && !settings.selectionReaderEnabled) {
+      setPosition(null);
+      return;
+    }
+
     const sel = window.getSelection();
     const text = sel?.toString?.()?.trim() ?? '';
     if (!text) {

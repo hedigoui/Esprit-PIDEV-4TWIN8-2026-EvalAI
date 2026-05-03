@@ -8,6 +8,7 @@ import { CommunicationModule } from './communication/communication.module';
 import { ReclamationsModule } from './reclamations/reclamations.module';
 import { EvaluationModule } from './evaluation/evaluation.module';
 import { OralPerformanceModule } from './oral-performance/oral-performance.module';
+import { AssemblyAIModule } from './assemblyai/assemblyai.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { Users } from './users/users.models';
@@ -53,6 +54,7 @@ import {
     ReclamationsModule,
     EvaluationModule,
     OralPerformanceModule,
+    AssemblyAIModule,
   ],
   controllers: [AppController],
   providers: [AppService],

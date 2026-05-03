@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
@@ -6,16 +5,48 @@ const LANGUAGES = [
   { code: 'en', label: 'English', prefix: 'GB', flag: '🇬🇧' },
   { code: 'fr', label: 'Français', prefix: 'FR', flag: '🇫🇷' },
   { code: 'ar', label: 'العربية', prefix: 'SA', flag: '🇸🇦' },
+  { code: 'es', label: 'Español', prefix: 'ES', flag: '🇪🇸' },
+  { code: 'de', label: 'Deutsch', prefix: 'DE', flag: '🇩🇪' },
 ];
 
-const baseLang = (lng) => (lng || 'en').split('-')[0];
+const getInitialLang = () => {
+  if (typeof document === 'undefined') return 'en';
+  const match = document.cookie.match(/googtrans=\/[^/]+\/([^;]+)/);
+  return match ? match[1] : 'en';
+};
 
 const LanguageSwitcher = () => {
-  const { i18n } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [activeCode, setActiveCode] = useState(getInitialLang());
   const boxRef = useRef(null);
   const buttonRef = useRef(null);
-  const activeCode = baseLang(i18n.language || i18n.resolvedLanguage);
+  const googleTranslateInitialized = useRef(false);
+
+  useEffect(() => {
+    // Inject Google Translate script if not present
+    if (!document.getElementById('google-translate-script')) {
+      const script = document.createElement('script');
+      script.id = 'google-translate-script';
+      script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+      script.async = true;
+      
+      window.googleTranslateElementInit = () => {
+        new window.google.translate.TranslateElement(
+          {
+            pageLanguage: 'en',
+            includedLanguages: 'en,fr,ar,es,de',
+            autoDisplay: false,
+          },
+          'google_translate_element'
+        );
+        googleTranslateInitialized.current = true;
+      };
+      
+      document.body.appendChild(script);
+    } else {
+      googleTranslateInitialized.current = true;
+    }
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -26,7 +57,6 @@ const LanguageSwitcher = () => {
         setOpen(false);
         buttonRef.current?.focus();
       }
-      // Alt + L for language switcher
       if (e.altKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         setOpen(prev => !prev);
@@ -34,19 +64,62 @@ const LanguageSwitcher = () => {
     };
     document.addEventListener('click', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
+
+    // Aggressively remove Google Translate's injected top margin
+    const cleanupInterval = setInterval(() => {
+      // Force body and html to not have top padding
+      if (document.body.style.top) document.body.style.top = '0px';
+      if (document.body.style.position === 'relative') document.body.style.position = 'static';
+      if (document.documentElement.style.top) document.documentElement.style.top = '0px';
+      
+      // Look for the banner iframe and destroy it completely
+      const banners = document.querySelectorAll('.goog-te-banner-frame');
+      banners.forEach(banner => {
+        if (banner) {
+          banner.style.display = 'none';
+          // Also try to hide the wrapper if it exists
+          if (banner.parentElement && banner.parentElement.classList.contains('skiptranslate')) {
+            banner.parentElement.style.display = 'none';
+          }
+        }
+      });
+      
+      // Hide any other skiptranslate elements at the body level (except our widget)
+      const skips = document.querySelectorAll('body > .skiptranslate');
+      skips.forEach(skip => {
+        if (skip && skip.tagName.toLowerCase() === 'div' && skip.id !== 'google_translate_element') {
+          skip.style.display = 'none';
+        }
+      });
+    }, 50);
+
     return () => {
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
+      clearInterval(cleanupInterval);
     };
   }, [open]);
 
-  const current = LANGUAGES.find((l) => l.code === activeCode) || LANGUAGES[0];
+  const triggerGoogleTranslate = (langCode) => {
+    const select = document.querySelector('.goog-te-combo');
+    if (select) {
+      select.value = langCode;
+      select.dispatchEvent(new Event('change'));
+    } else {
+      // If select isn't ready yet, set the cookie and reload
+      document.cookie = `googtrans=/en/${langCode}; path=/`;
+      window.location.reload();
+    }
+  };
 
   const handleLanguageChange = (langCode) => {
-    i18n.changeLanguage(langCode);
+    setActiveCode(langCode);
+    triggerGoogleTranslate(langCode);
     setOpen(false);
     buttonRef.current?.focus();
   };
+
+  const current = LANGUAGES.find((l) => l.code === activeCode) || LANGUAGES[0];
 
   return (
     <div
@@ -54,10 +127,11 @@ const LanguageSwitcher = () => {
       style={{
         position: 'fixed',
         top: '1rem',
-        right: '1rem',
+        right: '1.5rem',
         zIndex: 9998,
       }}
     >
+      <div id="google_translate_element" style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', zIndex: -1 }}></div>
       <button
         ref={buttonRef}
         type="button"
@@ -114,7 +188,7 @@ const LanguageSwitcher = () => {
             position: 'absolute',
             top: '100%',
             right: 0,
-            marginTop: 6,
+            marginTop: 8,
             background: 'rgba(15,15,26,0.98)',
             border: '2px solid rgba(227,24,55,0.3)',
             borderRadius: 10,
@@ -188,14 +262,36 @@ const LanguageSwitcher = () => {
       )}
       <style>{`
         @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        /* Aggressively Hide Google Translate Banner */
+        .goog-te-banner-frame {
+          display: none !important;
+          visibility: hidden !important;
+        }
+        iframe.goog-te-banner-frame {
+          display: none !important;
+        }
+        .goog-te-gadget-icon {
+          display: none !important;
+        }
+        /* Prevent body/html shifting */
+        body {
+          top: 0px !important;
+          position: static !important;
+        }
+        html {
+          top: 0px !important;
+          position: static !important;
+        }
+        /* Hide tooltips and highlights */
+        #goog-gt-tt, .goog-te-balloon-frame {
+          display: none !important;
+        }
+        .goog-text-highlight {
+          background: none !important;
+          box-shadow: none !important;
         }
       `}</style>
     </div>
