@@ -1,0 +1,72 @@
+{
+  "instructorId": "69e7fff4fe2b80dbd899876e",
+  "createdAt": "2026-05-03T20:54:32.356Z",
+  "updatedAt": "2026-05-03T20:54:32.356Z",
+  "originalFilename": "sample-roster.xlsx",
+  "rows": [
+    {
+      "rowNumber": 2,
+      "firstName": "Ahmed",
+      "lastName": "Hassan",
+      "studentId": "S001",
+      "email": "ahmed.hassan@example.com",
+      "cefrLevel": ""
+    },
+    {
+      "rowNumber": 3,
+      "firstName": "Fatima",
+      "lastName": "Ali",
+      "studentId": "S002",
+      "email": "fatima.ali@example.com",
+      "cefrLevel": ""
+    },
+    {
+      "rowNumber": 4,
+      "firstName": "Mohammed",
+      "lastName": "Omar",
+      "studentId": "S003",
+      "email": "mohammed.omar@example.com",
+      "cefrLevel": ""
+    },
+    {
+      "rowNumber": 5,
+      "firstName": "Layla",
+      "lastName": "Ibrahim",
+      "studentId": "S004",
+      "email": "layla.ibrahim@example.com",
+      "cefrLevel": ""
+    },
+    {
+      "rowNumber": 6,
+      "firstName": "Karim",
+      "lastName": "Noor",
+      "studentId": "S005",
+      "email": "karim.noor@example.com",
+      "cefrLevel": ""
+    },
+    {
+      "rowNumber": 7,
+      "firstName": "Noor",
+      "lastName": "Salim",
+      "studentId": "S006",
+      "email": "noor.salim@example.com",
+      "cefrLevel": ""
+    },
+    {
+      "rowNumber": 8,
+      "firstName": "Sara",
+      "lastName": "Khalil",
+      "studentId": "S007",
+      "email": "sara.khalil@example.com",
+      "cefrLevel": ""
+    },
+    {
+      "rowNumber": 9,
+      "firstName": "Hamza",
+      "lastName": "Rashid",
+      "studentId": "S008",
+      "email": "hamza.rashid@example.com",
+      "cefrLevel": ""
+    }
+  ]
+}
