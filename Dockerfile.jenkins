@@ -1,4 +1,21 @@
+# FROM jenkins/jenkins:lts
+# USER root
+# RUN apt-get update && apt-get install -y curl
+# RUN curl -LO "https://dl.k8s.io/release/v1.28.15/bin/linux/amd64/kubectl" && \
+#     chmod +x kubectl && \
+#     mv kubectl /usr/local/bin/
+# USER jenkins
 FROM jenkins/jenkins:lts
 USER root
-RUN apt-get update && apt-get install -y docker.io
+
+# Installer Node.js
+RUN apt-get update && apt-get install -y curl && \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs
+
+# Installer kubectl
+RUN curl -LO "https://dl.k8s.io/release/v1.28.15/bin/linux/amd64/kubectl" && \
+    chmod +x kubectl && \
+    mv kubectl /usr/local/bin/
+
 USER jenkins

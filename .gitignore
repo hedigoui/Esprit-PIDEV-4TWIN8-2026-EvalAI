@@ -4,3 +4,4 @@ back/.env
 .env.*
 !.env.example
 !.back/.env.example
+.env
