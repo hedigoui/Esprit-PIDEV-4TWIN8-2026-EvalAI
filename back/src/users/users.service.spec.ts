@@ -112,4 +112,9 @@ describe('UsersService', () => {
       expect(result).toBe(true);
     });
   });
+  // À ajouter dans UsersService
+unusedFunction() {
+  console.log('This function is never used');
+  return 'dead code';
+}
 });
