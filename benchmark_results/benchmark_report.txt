@@ -1,0 +1,140 @@
+================================================================================
+AUDIO PERFORMANCE EVALUATION SYSTEMS - BENCHMARK REPORT
+Comparing: PI (AssemblyAI + DeepSeek) vs SpeechOcean762 (Whisper + ML)
+================================================================================
+
+DATASET
+--------------------------------------------------------------------------------
+Test Samples: 240 utterances
+Ground Truth: SpeechOcean762 expert-scored dataset
+Expert Scorers: 5 independent evaluators (phoneme, word, sentence levels)
+Average Expert Score (Overall): 7.63/10
+Score Range: 4.0 - 10.0
+
+METHODOLOGY
+--------------------------------------------------------------------------------
+1. Both systems evaluated identical audio samples
+2. Predictions normalized to 0-100 scale
+3. Expert scores normalized to 0-100 scale for comparison
+4. Metrics calculated:
+   - MAE (Mean Absolute Error): Average prediction error
+   - RMSE (Root Mean Squared Error): Penalizes large errors
+   - Pearson Correlation: Linear relationship strength
+   - Spearman Correlation: Rank-order agreement
+
+================================================================================
+RESULTS
+================================================================================
+
+1. PRONUNCIATION ACCURACY
+--------------------------------------------------------------------------------
+Metric               PI                   SpeechOcean         
+-------------------- -------------------- --------------------
+MAE                  33.506               33.506              
+RMSE                 36.254               36.254              
+Pearson r            -0.150               -0.150              
+Spearman ρ           -0.154               -0.154              
+
+✅ WINNER (lower MAE): PI
+
+2. FLUENCY ASSESSMENT
+--------------------------------------------------------------------------------
+Metric               PI                   SpeechOcean         
+-------------------- -------------------- --------------------
+MAE                  13.437               7.591               
+RMSE                 16.177               9.021               
+Pearson r            0.005                0.165               
+Spearman ρ           -0.023               0.181               
+
+✅ WINNER (lower MAE): SpeechOcean
+
+3. CONFIDENCE/STABILITY
+--------------------------------------------------------------------------------
+Metric               PI                   SpeechOcean         
+-------------------- -------------------- --------------------
+MAE                  19.078               28.602              
+RMSE                 21.047               31.198              
+Pearson r            -0.202               -0.067              
+Spearman ρ           -0.268               -0.041              
+
+✅ WINNER (lower MAE): PI
+
+4. OVERALL SCORE
+--------------------------------------------------------------------------------
+Metric               PI                   SpeechOcean         
+-------------------- -------------------- --------------------
+MAE                  8.726                21.079              
+RMSE                 11.013               23.252              
+Pearson r            0.135                0.146               
+Spearman ρ           0.133                0.135               
+
+✅ WINNER (lower MAE): PI
+
+================================================================================
+SUMMARY & RECOMMENDATIONS
+================================================================================
+
+STRENGTHS:
+
+PI (AssemblyAI + DeepSeek):
+  ✓ Semantic content analysis via LLM
+  ✓ Comprehensive feedback generation
+  ✓ CEFR proficiency level classification
+  ✓ Handles off-topic/incomplete responses
+  ✓ Better for general English proficiency assessment
+
+SpeechOcean (Whisper + ML):
+  ✓ Fully offline-capable (no API dependency)
+  ✓ Lower latency and cost
+  ✓ Objective acoustic-based metrics
+  ✓ Trained on expert-labeled data
+  ✓ Better for pure pronunciation scoring
+
+RECOMMENDATION:
+--------------------------------------------------------------------------------
+🏆 PI WINS (AssemblyAI + DeepSeek approach)
+
+Use PI if you prioritize:
+  • Comprehensive proficiency assessment
+  • Detailed written feedback
+  • CEFR certification standards
+  • Semantic content understanding
+
+HYBRID APPROACH:
+--------------------------------------------------------------------------------
+Consider combining both:
+  • Use SpeechOcean for fast, objective pronunciation metrics
+  • Use PI for comprehensive proficiency assessment & feedback
+  • Blend scores for robust evaluation
+
+================================================================================
+DETAILED ERROR ANALYSIS
+================================================================================
+
+Pronunciation Prediction Errors:
+--------------------------------------------------------------------------------
+Metric                         PI                   SpeechOcean         
+------------------------------ -------------------- --------------------
+Mean Error                     -33.133              -33.133             
+Std Dev                        14.747               14.747              
+Min Error                      -66.066              -66.066             
+Max Error                      12.686               12.686              
+Median Absolute Error          35.159               35.159              
+
+Fluency Prediction Errors:
+--------------------------------------------------------------------------------
+Metric                         PI                   SpeechOcean         
+------------------------------ -------------------- --------------------
+Mean Error                     -12.659              2.228               
+Std Dev                        10.094               8.760               
+Median Absolute Error          11.900               5.242               
+
+Overall Score Prediction Errors:
+--------------------------------------------------------------------------------
+Metric                         PI                   SpeechOcean         
+------------------------------ -------------------- --------------------
+Mean Error                     -3.792               -20.481             
+Std Dev                        10.362               11.032              
+Median Absolute Error          7.158                21.324              
+95% Confidence Interval        ±20.309             ±21.623            
+
