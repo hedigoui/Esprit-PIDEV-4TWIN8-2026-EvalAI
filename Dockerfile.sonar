@@ -1,0 +1,6 @@
+FROM node:18-alpine
+
+RUN apk add --no-cache openjdk17-jre
+RUN npm install -g sonarqube-scanner
+
+WORKDIR /workspace

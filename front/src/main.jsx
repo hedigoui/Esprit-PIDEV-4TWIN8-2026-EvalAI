@@ -1,10 +1,17 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import './config/i18n.js'
 import App from './App.jsx'
+import { initTheme } from './theme'
+import { I18nProvider } from './i18n/I18nProvider'
+
+initTheme()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <I18nProvider>
+      <App />
+    </I18nProvider>
   </StrictMode>,
 )

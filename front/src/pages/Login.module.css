@@ -149,11 +149,14 @@
   padding: 2rem;
   background: #fafafa;
   position: relative;
+  overflow-y: auto;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
 }
 
 .formWrapper {
   width: 100%;
   max-width: 420px;
+  animation: fadeUp 0.5s ease-out;
 }
 
 .formHeader {
@@ -172,6 +175,18 @@
   color: #888;
   font-size: 0.9rem;
   margin: 0;
+}
+
+/* ===== ERROR MESSAGE ===== */
+.errorMessage {
+  background: #ffebee;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  color: #c62828;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 /* ===== ROLE SELECTOR ===== */
@@ -403,10 +418,12 @@
   color: #E31837;
   text-decoration: none;
   font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .signupLink a:hover {
   text-decoration: underline;
+  transform: translateX(2px);
 }
 
 /* ===== FOOTER ===== */
@@ -469,4 +486,106 @@
   .socialButtons {
     flex-direction: column;
   }
+}
+/* ===== ANIMATIONS ===== */
+.fadeIn {
+  opacity: 1;
+  transform: translateX(0);
+  animation: slideIn 0.3s ease-in-out;
+}
+
+.fadeOut {
+  opacity: 0;
+  transform: translateX(20px);
+  pointer-events: none;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dark theme (saved in Settings / localStorage, applied on <html>) */
+:global([data-theme='dark']) .rightPanel {
+  background: var(--bg-main);
+}
+
+:global([data-theme='dark']) .title {
+  color: var(--text-primary);
+}
+
+:global([data-theme='dark']) .subtitle {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .label {
+  color: var(--text-secondary);
+}
+
+:global([data-theme='dark']) .roleButton {
+  background: var(--bg-card-solid);
+  border-color: var(--border-light);
+  color: var(--text-secondary);
+}
+
+:global([data-theme='dark']) .activeRole {
+  background: var(--primary-soft);
+}
+
+:global([data-theme='dark']) .input {
+  background: var(--bg-card-solid);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+:global([data-theme='dark']) .input::placeholder {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .rememberMe {
+  color: var(--text-secondary);
+}
+
+:global([data-theme='dark']) .dividerLine {
+  background: var(--border-light);
+}
+
+:global([data-theme='dark']) .dividerText {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .socialButton {
+  background: var(--bg-card-solid);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+:global([data-theme='dark']) .signupLink {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .footer {
+  color: var(--text-muted);
+}
+
+:global([data-theme='dark']) .inputIcon,
+:global([data-theme='dark']) .eyeButton {
+  color: var(--text-muted);
 }

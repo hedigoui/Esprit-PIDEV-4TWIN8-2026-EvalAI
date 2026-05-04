@@ -1,0 +1,40 @@
+{
+  "instructorId": "69cfc4c87180c6ebdc267b6d",
+  "createdAt": "2026-04-14T01:27:49.884Z",
+  "updatedAt": "2026-04-14T01:57:58.733Z",
+  "originalFilename": "Book 2.xlsx",
+  "rows": [
+    {
+      "rowNumber": 1,
+      "firstName": "hazem",
+      "lastName": "hazem",
+      "studentId": "",
+      "email": "",
+      "cefrLevel": ""
+    },
+    {
+      "rowNumber": 2,
+      "firstName": "mine",
+      "lastName": "amine",
+      "studentId": "",
+      "email": "",
+      "cefrLevel": ""
+    },
+    {
+      "rowNumber": 3,
+      "firstName": "neymar",
+      "lastName": "neymar",
+      "studentId": "",
+      "email": "",
+      "cefrLevel": ""
+    },
+    {
+      "rowNumber": 4,
+      "firstName": "cr",
+      "lastName": "",
+      "studentId": "",
+      "email": "",
+      "cefrLevel": ""
+    }
+  ]
+}
