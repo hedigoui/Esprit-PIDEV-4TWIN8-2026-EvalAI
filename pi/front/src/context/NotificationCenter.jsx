@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { Bell, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useI18n } from '../i18n/I18nProvider';
+import { API_BASE_URL } from '../config/api';
 
 const NotificationCenterContext = createContext(null);
 
@@ -93,11 +94,11 @@ export const NotificationCenterProvider = ({ children }) => {
     setLoading(true);
     try {
       const [notifRes, inviteRes] = await Promise.all([
-        fetch('http://localhost:3000/communication/notifications', {
+        fetch(`${API_BASE_URL}/communication/notifications`, {
           headers: { Authorization: `Bearer ${authToken}` },
         }),
         authRole === 'student'
-          ? fetch('http://localhost:3000/communication/invitations/received', {
+          ? fetch(`${API_BASE_URL}/communication/invitations/received`, {
             headers: { Authorization: `Bearer ${authToken}` },
           })
           : Promise.resolve(null),
@@ -129,7 +130,7 @@ export const NotificationCenterProvider = ({ children }) => {
   const markAllRead = useCallback(async () => {
     if (!authToken) return;
 
-    await fetch('http://localhost:3000/communication/notifications/read-all', {
+    await fetch(`${API_BASE_URL}/communication/notifications/read-all`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${authToken}` },
     });
@@ -141,7 +142,7 @@ export const NotificationCenterProvider = ({ children }) => {
   const acceptInvite = useCallback(async (id) => {
     if (!authToken) return;
 
-    await fetch(`http://localhost:3000/communication/invitations/${id}/accept`, {
+    await fetch(`${API_BASE_URL}/communication/invitations/${id}/accept`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${authToken}` },
     });
@@ -152,7 +153,7 @@ export const NotificationCenterProvider = ({ children }) => {
   const rejectInvite = useCallback(async (id) => {
     if (!authToken) return;
 
-    await fetch(`http://localhost:3000/communication/invitations/${id}/reject`, {
+    await fetch(`${API_BASE_URL}/communication/invitations/${id}/reject`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${authToken}` },
     });
@@ -168,7 +169,7 @@ export const NotificationCenterProvider = ({ children }) => {
   useEffect(() => {
     if (!authToken) return;
 
-    const socket = io('http://localhost:3000', {
+    const socket = io(API_BASE_URL, {
       auth: { token: authToken },
       transports: ['polling'],
       upgrade: false,
