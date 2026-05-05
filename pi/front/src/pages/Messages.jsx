@@ -9,6 +9,7 @@ import AdminSidebar from '../components/AdminSidebar';
 import TopNavbar from '../components/TopNavbar';
 import { useI18n } from '../i18n/I18nProvider';
 import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL } from '../config/api';
 
 // Avatar component - displays DiceBear avatar
 const Avatar = ({ name, avatar, gender, size = 40 }) => {
@@ -306,7 +307,7 @@ const Messages = () => {
     const token = localStorage.getItem('token');
     if (!token || !messageId) return;
     try {
-      const res = await fetch(`http://localhost:3000/communication/messages/${messageId}`, {
+      const res = await fetch(`${API_BASE_URL}/communication/messages/${messageId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -333,7 +334,7 @@ const Messages = () => {
     const token = localStorage.getItem('token');
     if (!token || !messageId || !editingText.trim()) return;
     try {
-      const res = await fetch(`http://localhost:3000/communication/messages/${messageId}`, {
+      const res = await fetch(`${API_BASE_URL}/communication/messages/${messageId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
