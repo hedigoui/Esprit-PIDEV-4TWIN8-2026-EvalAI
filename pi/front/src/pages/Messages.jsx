@@ -9,7 +9,6 @@ import AdminSidebar from '../components/AdminSidebar';
 import TopNavbar from '../components/TopNavbar';
 import { useI18n } from '../i18n/I18nProvider';
 import { API_BASE_URL } from '../config/api';
-import { API_BASE_URL } from '../config/api';
 
 // Avatar component - displays DiceBear avatar
 const Avatar = ({ name, avatar, gender, size = 40 }) => {
