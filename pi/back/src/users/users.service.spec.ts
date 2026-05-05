@@ -48,14 +48,6 @@ describe('UsersService', () => {
         lastName: 'Doe',
       };
 
-      const mockUser = {
-        id: '1',
-        ...createUserDto,
-        password: 'hashed_password',
-        role: 'STUDENT',
-        isActive: true,
-      };
-
       const result = await service.createUser(createUserDto);
 
       expect(result.email).toBe('test@test.com');
@@ -112,5 +104,4 @@ describe('UsersService', () => {
       expect(result).toBe(true);
     });
   });
-  
 });

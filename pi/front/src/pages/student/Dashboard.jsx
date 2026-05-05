@@ -99,6 +99,19 @@ const dashStyles = `
     margin: 0;
   }
 
+  .hero-live-exam-tip {
+    margin: 0.75rem 0 0;
+    max-width: 420px;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.45);
+    font-weight: 500;
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
   .hero-orb {
     width: 90px;
     height: 90px;
@@ -553,6 +566,7 @@ const Dashboard = () => {
                 </div>
                 <h1 className="hero-title">{t('studentDashboard.heroTitle')}</h1>
                 <p className="hero-subtitle">{t('studentDashboard.heroSubtitle')}</p>
+                <p className="hero-live-exam-tip">{t('studentDashboard.liveExamTip')}</p>
               </div>
               <div className="hero-orb">
                 <Mic size={36} strokeWidth={1.5} />

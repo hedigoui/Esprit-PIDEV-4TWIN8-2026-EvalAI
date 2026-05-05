@@ -140,14 +140,7 @@ describe('ReclamationsService', () => {
       expect(result).toEqual([]);
     });
   });
-// Ajoute cette fonction inutile (dead code)
-function unusedFunction() {
-  let x = 0;
-  for(let i = 0; i < 10; i++) {
-    x += i;
-  }
-  return x;
-}
+
   describe('getInstructorReclamations', () => {
     it('should retrieve reclamations assigned to instructor', async () => {
       const instructorId = 'instructor-1';
@@ -242,9 +235,4 @@ function unusedFunction() {
       ).rejects.toThrow();
     });
   });
-  // unusedMethodInService() {
-  //   const test = 'unused';
-  //   console.log('This method is never called');
-  //   return test;
-  // }
 });

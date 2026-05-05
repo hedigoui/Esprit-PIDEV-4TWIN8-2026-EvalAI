@@ -16,6 +16,7 @@ import {
 } from './communication.models';
 import { Users } from '../users/users.models';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -30,9 +31,17 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
       Report,
       Users,
     ]),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-      signOptions: { expiresIn: '1d' },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => {
+        const secret = configService.get<string>('JWT_SECRET');
+        console.log('[CommunicationModule] JWT Secret present:', !!secret);
+        return {
+          secret: secret || 'your-secret-key',
+          signOptions: { expiresIn: '1d' },
+        };
+      },
+      inject: [ConfigService],
     }),
   ],
   controllers: [CommunicationController],

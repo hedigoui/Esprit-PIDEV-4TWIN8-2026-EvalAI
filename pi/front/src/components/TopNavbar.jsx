@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Settings, ChevronDown, LogOut, User, CheckCircle } from 'lucide-react';
 import { useI18n } from '../i18n/I18nProvider';
 import { useNotificationCenter } from '../context/NotificationCenter';
+import LanguageSwitcher from './accessibility/LanguageSwitcher';
 
 const TopNavbar = () => {
   const location = useLocation();
@@ -79,6 +80,7 @@ const TopNavbar = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('token'); localStorage.removeItem('user'); localStorage.removeItem('rememberMe');
+    window.dispatchEvent(new Event('evalai:user-updated'));
     navigate('/', { replace: true });
   };
 
@@ -233,15 +235,7 @@ const TopNavbar = () => {
           </div>
 
           <div className="tnav-right">
-            <select
-              className="tnav-lang-select"
-              aria-label={t('common.language')}
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-            >
-              <option value="en">EN</option>
-              <option value="fr">FR</option>
-            </select>
+            <LanguageSwitcher />
 
             {/* Notifications */}
             <div style={{ position: 'relative' }} ref={notifRef}>

@@ -4,6 +4,7 @@ import TopNavbar from '../../components/TopNavbar';
 import { Bell, Lock, Volume2, Moon, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { getStoredTheme, setStoredTheme } from '../../theme';
 import { useI18n } from '../../i18n/I18nProvider';
+import { useAccessibilitySettings } from '../../hooks/useAccessibilitySettings';
 
 const settingsPageStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
@@ -283,7 +284,8 @@ const Settings = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [user, setUser] = useState(null);
-  const [darkMode, setDarkMode] = useState(() => getStoredTheme() === 'dark');
+  const { settings, updateSetting } = useAccessibilitySettings();
+  const [darkMode, setDarkMode] = useState(settings.nightModeIntensity > 0);
   const { t, language, setLanguage } = useI18n();
 
   useEffect(() => {
@@ -398,6 +400,36 @@ const Settings = () => {
                     <option value="en">{t('common.english')}</option>
                     <option value="fr">{t('common.french')}</option>
                   </select>
+                </div>
+
+                <div className="stp-toggle-item">
+                  <div className="stp-toggle-label">
+                    <h4>Night Shift</h4>
+                    <p>Warm screen tint for eye comfort</p>
+                  </div>
+                  <label className="stp-toggle">
+                    <input
+                      type="checkbox"
+                      checked={settings.nightShift}
+                      onChange={(e) => updateSetting('nightShift', e.target.checked)}
+                    />
+                    <span className="stp-toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div className="stp-form-group">
+                  <label className="stp-form-label">Dark Mode Depth ({settings.nightModeIntensity}%)</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="80"
+                    step="5"
+                    value={settings.nightModeIntensity}
+                    onChange={(e) => updateSetting('nightModeIntensity', parseInt(e.target.value))}
+                    className="stp-range"
+                    style={{ width: '100%', height: '6px', accentColor: '#E31837' }}
+                  />
+                  <p className="stp-form-desc">Adjust the deepness of the dark background</p>
                 </div>
               </div>
 

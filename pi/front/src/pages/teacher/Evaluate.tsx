@@ -9,6 +9,8 @@ import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import { useEvaluation } from '../../hooks/useEvaluation';
 import { oralPerformanceService } from '../services/oralPerformance.service';
 import type { InstructorRosterRow } from '../services/oralPerformance.service';
+import { useSocket } from '../../context/SocketContext';
+import { Video } from 'lucide-react';
 
 // @ts-ignore
 import styles from '../../styles/shared.module.css';
@@ -73,6 +75,7 @@ const Evaluate: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { studentId, performanceId } = useParams<{ studentId: string; performanceId: string }>();
+  const { socket } = useSocket();
 
   const [recordMode, setRecordMode] = useState<'upload' | 'record'>('record');
   const [performance, setPerformance] = useState<Performance | null>(null);
@@ -139,6 +142,40 @@ const Evaluate: React.FC = () => {
       .toLowerCase()
       .replace(/\s+/g, ' ');
 
+  const handleOnlineExam = async (targetStudentId: string) => {
+    if (!targetStudentId) {
+      setUploadError('Select a student first.');
+      return;
+    }
+    const currentInstructorId = currentUser?.id || currentUser?._id;
+    if (!currentInstructorId) {
+      setUploadError('You must be signed in to invite students.');
+      return;
+    }
+    if (!socket) {
+      setUploadError('Messaging system is not connected.');
+      return;
+    }
+
+    // Ensure the teacher is registered on the socket before sending the invite
+    socket.emit('register', { userId: String(currentInstructorId) });
+
+    const roomId = `exam_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+    
+    // Attempt to send invite with a callback to confirm student status
+    socket.emit(
+      'sendExamInvite', 
+      { studentId: targetStudentId, teacherId: String(currentInstructorId), roomId },
+      (response: any) => {
+        if (response?.status === 'invite_sent') {
+          navigate(`/teacher/exam-room/${roomId}`);
+        } else {
+          setUploadError('The student is currently offline and cannot be invited.');
+        }
+      }
+    );
+  };
+
   const selectedRosterStudentEvaluations = useMemo(() => {
     if (!selectedRosterStudent) return [] as Performance[];
 
@@ -184,6 +221,7 @@ const Evaluate: React.FC = () => {
       setIsLoading(true);
       const data = await oralPerformanceService.getPerformance(performanceId as string);
       setPerformance(data);
+      if (data.title && !subject) setSubject(data.title);
       console.log('Loaded performance:', data);
     } catch (error) {
       console.error('Failed to load performance:', error);
@@ -280,9 +318,16 @@ const Evaluate: React.FC = () => {
 
   useEffect(() => {
     const pid = performance?._id;
-    if (!pid || evaluation?.status !== 'completed' || !evaluation.speechMetrics) return;
-    if (performanceHasSavedInstructorScores(performance)) { aiRubricImportedForPerformanceId.current = pid; setShowEvaluationForm(true); return; }
-    if (aiRubricImportedForPerformanceId.current === pid) { setShowEvaluationForm(true); return; }
+    if (!pid) return;
+
+    // Always show the evaluation form if we have a saved performance with audio
+    if (performance.audioFile) {
+      setShowEvaluationForm(true);
+    }
+
+    if (evaluation?.status !== 'completed' || !evaluation.speechMetrics) return;
+    if (performanceHasSavedInstructorScores(performance)) { aiRubricImportedForPerformanceId.current = pid; return; }
+    if (aiRubricImportedForPerformanceId.current === pid) { return; }
     aiRubricImportedForPerformanceId.current = pid;
     const sm = evaluation.speechMetrics;
     setScores({
@@ -299,7 +344,6 @@ const Evaluate: React.FC = () => {
       if (hit) setCefrLevel(hit);
       else { const avg = (sm.fluency + sm.pronunciation + sm.confidence) / 3; setCefrLevel(avg >= 85 ? 'C1' : avg >= 75 ? 'B2' : avg >= 65 ? 'B1' : avg >= 55 ? 'A2' : 'A1'); }
     } else { const avg = (sm.fluency + sm.pronunciation + sm.confidence) / 3; setCefrLevel(avg >= 85 ? 'C1' : avg >= 75 ? 'B2' : avg >= 65 ? 'B1' : avg >= 55 ? 'A2' : 'A1'); }
-    setShowEvaluationForm(true);
   }, [evaluation, performance]);
 
   const handleScoreChange = (metric: keyof Scores, value: number): void => setScores(prev => ({ ...prev, [metric]: value }));
@@ -393,7 +437,12 @@ const Evaluate: React.FC = () => {
         const newPerformance = await oralPerformanceService.create({ studentId: effectiveStudentId, instructorId: instructorId || undefined, title: subject.trim(), description: notes || undefined });
         currentPerformance = await oralPerformanceService.uploadAudio(newPerformance._id, audioToUpload, durationInSeconds);
         setSelectedHistoryId('');
-        setPerformance(currentPerformance); setRecordingPrepared(false);
+        setPerformance(currentPerformance); 
+        setRecordingPrepared(false);
+        setShowEvaluationForm(true);
+        
+        // Navigate to the performance URL to persist state on reload
+        navigate(`/teacher/evaluate/${effectiveStudentId}/${currentPerformance._id}`, { replace: true });
       }
       if (!currentPerformance?._id) { setUploadError('Performance is not ready. Save the recording and try again.'); return; }
       const perfId = currentPerformance._id;
@@ -474,7 +523,13 @@ const Evaluate: React.FC = () => {
       setActionSuccessMessage('Saved as draft successfully.');
     }
     setPendingAction(null);
-    setTimeout(() => window.location.reload(), 1400);
+    // Refresh history and data instead of full reload
+    await loadInstructorHistory();
+    if (performance?._id) {
+      const updated = await oralPerformanceService.getPerformance(performance._id);
+      setPerformance(updated);
+    }
+    setTimeout(() => setActionSuccessMessage(null), 3000);
   };
 
   const getSubmissionStatusIndicator = (status?: string): string => {
@@ -978,6 +1033,9 @@ const Evaluate: React.FC = () => {
                 <button type="button" className={secondaryButtonClass} onClick={handleNewEvaluation} title="Clear this session and start a new evaluation">
                   <RotateCcw size={16} /> New evaluation
                 </button>
+                <button type="button" className={secondaryButtonClass} onClick={() => handleOnlineExam(effectiveStudentId)} disabled={!effectiveStudentId}>
+                  <Video size={16} /> Invite to Online Exam
+                </button>
                 {(recordingPrepared || performance?.audioFile) && (
                   <button className={primaryButtonClass} onClick={handleStartEvaluation} disabled={isLoading || isEvaluating}>
                     <Send size={16} />
@@ -1021,6 +1079,9 @@ const Evaluate: React.FC = () => {
                       </button>
                       <button onClick={() => setRecordMode('record')} className={`ev-mode-tab${recordMode === 'record' ? ' active' : ''}`}>
                         <Mic size={15} /> Record Live
+                      </button>
+                      <button onClick={() => handleOnlineExam(effectiveStudentId)} className="ev-mode-tab" disabled={!effectiveStudentId}>
+                        <Video size={15} /> Invite to Online Exam
                       </button>
                     </div>
 
@@ -1110,7 +1171,7 @@ const Evaluate: React.FC = () => {
                   </div>
 
                   {/* AI Evaluation Card */}
-                  {showEvaluationForm && (recordingPrepared || performance?.audioFile) && (
+                  {(showEvaluationForm || recordingPrepared || performance?.audioFile) && (
                     <div className="ev-card">
                       <div className="ev-section-header">
                         <div className="ev-section-icon"><Bot size={16} /></div>
@@ -1315,6 +1376,35 @@ const Evaluate: React.FC = () => {
                             </div>
                           )}
                         </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Live Online Exam Session */}
+                  <div className="ev-card" style={{ border: '1px solid rgba(227,24,55,0.2)', background: 'rgba(227,24,55,0.02)', marginBottom: '1.25rem' }}>
+                    <div className="ev-card-header">
+                      <div className="ev-section-icon" style={{ background: '#E31837', color: '#fff' }}>
+                        <Video size={16} />
+                      </div>
+                      <h3 style={{ color: '#E31837' }}>Live Interaction</h3>
+                    </div>
+                    <div className="ev-card-body">
+                      <p style={{ margin: '0 0 1rem', fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5 }}>
+                        Start a live video/audio session with the selected student for a real-time oral examination.
+                      </p>
+                      <button
+                        type="button"
+                        className={primaryButtonClass}
+                        style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #E31837, #dc2626)', boxShadow: '0 4px 15px rgba(227,24,55,0.3)' }}
+                        onClick={() => handleOnlineExam(effectiveStudentId)}
+                        disabled={!effectiveStudentId}
+                      >
+                        <Video size={16} /> Start Live Exam Session
+                      </button>
+                      {!effectiveStudentId && (
+                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.72rem', color: '#ef4444', fontWeight: 600, textAlign: 'center' }}>
+                          * Select a student first
+                        </p>
                       )}
                     </div>
                   </div>

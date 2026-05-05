@@ -54,6 +54,7 @@ export default function AuthCallback() {
 
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
+    window.dispatchEvent(new Event('evalai:user-updated'));
 
     const role = user.role;
     if (role === 'admin') {

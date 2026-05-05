@@ -1,29 +1,6 @@
 FROM node:18-alpine
 
-# Install Java runtime and sonar-scanner
 RUN apk add --no-cache openjdk17-jre
 RUN npm install -g sonarqube-scanner
 
 WORKDIR /workspace
-
-# Copy project files
-COPY . .
-
-# Install dependencies and run tests with coverage
-RUN cd back && npm ci && npm run test:cov
-
-# Run SonarQube scanner
-CMD sonar-scanner \
-  -Dsonar.projectKey=pi-last \
-  -Dsonar.projectName="Pi-Last - Oral AI Performance Platform" \
-  -Dsonar.projectVersion=1.0.0 \
-  -Dsonar.sources=back/src,front/src \
-  -Dsonar.tests=back/src,front/src \
-  -Dsonar.test.inclusions="**/*.spec.ts,**/*.test.js" \
-  -Dsonar.javascript.lcov.reportPaths=back/coverage/lcov.info \
-  -Dsonar.typescript.lcov.reportPaths=back/coverage/lcov.info \
-  -Dsonar.coverageReportPaths=back/coverage/cobertura-coverage.xml \
-  -Dsonar.junit.reportPaths=back/coverage/test-results.xml \
-  -Dsonar.exclusions="**/*.spec.ts,**/*.test.js,**/node_modules/**,**/dist/**,**/build/**" \
-  -Dsonar.coverage.exclusions="**/node_modules/**,**/dist/**,**/*.spec.ts,**/test/**" \
-  -Dsonar.sourceEncoding=UTF-8

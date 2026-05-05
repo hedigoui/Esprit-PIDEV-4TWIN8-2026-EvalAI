@@ -702,6 +702,15 @@ export const translations = {
       joinedMeta: 'Joined: {{date}}',
       loadingMore: 'Loading more students...',
       studentFallback: 'Student',
+      examLiveHint:
+        'Live oral exam: use the video icon on a student card. They must be logged into EvalAI (same browser session) to receive the invite.',
+      liveExamShort: 'Start live oral exam',
+      examNotSignedIn: 'You must be signed in to start a live exam.',
+      examSocketMissing:
+        'Live channel did not connect. Open DevTools → Console for [socket] errors. Check: (1) Nest API is running, (2) front .env VITE_API_URL matches that API origin (same host/port as your requests), (3) JWT_SECRET in the API matches the token your login issued.',
+      studentOfflineExam:
+        'Could not reach this student over the live channel. Ask them to open EvalAI and stay on the dashboard, then try again.',
+      examInviteTimeout: 'No response from the live server. Check your connection and try again.',
     },
     studentDashboard: {
       heroKicker: 'Student Studio',
@@ -729,6 +738,8 @@ export const translations = {
       readyToPractice: 'Ready to practice?',
       readySub: 'Start a new recording session and get instant AI feedback',
       startPracticeCta: 'Start Practice',
+      liveExamTip:
+        'When your teacher starts a live oral exam, a notification appears here — stay logged in with this tab open.',
       aiKeepTitle: 'Keep practicing',
       aiKeepDesc: 'Complete a session to see personalized AI tips.',
       aiStrength: 'Strength',
@@ -1466,6 +1477,15 @@ export const translations = {
       joinedMeta: 'Inscrit: {{date}}',
       loadingMore: 'Chargement de plus detudiants...',
       studentFallback: 'Etudiant',
+      examLiveHint:
+        'Examen oral en direct : icone video sur la carte etudiant. Letudiant doit etre connecte a EvalAI (meme session) pour recevoir linvitation.',
+      liveExamShort: 'Demarrer examen oral live',
+      examNotSignedIn: 'Connectez-vous pour lancer un examen live.',
+      examSocketMissing:
+        'Canal live non connecte. Console navigateur : erreurs [socket]. Verifiez API Nest, VITE_API_URL = meme origine que les requetes, et JWT_SECRET coherent avec le token.',
+      studentOfflineExam:
+        'Letudiant nest pas joignable en direct. Demandez-lui douvrir EvalAI et de rester sur le tableau de bord.',
+      examInviteTimeout: 'Pas de reponse du serveur live. Verifiez votre connexion.',
     },
     studentDashboard: {
       heroKicker: 'Studio etudiant',
@@ -1493,6 +1513,8 @@ export const translations = {
       readyToPractice: 'Pret a pratiquer?',
       readySub: 'Commencez une session et obtenez un feedback IA instantane',
       startPracticeCta: 'Commencer',
+      liveExamTip:
+        'Si votre professeur lance un examen oral en direct, une notification saffiche ici — restez connecte avec cet onglet ouvert.',
       aiKeepTitle: 'Continuer a pratiquer',
       aiKeepDesc: 'Terminez une session pour des conseils IA personnalises.',
       aiStrength: 'Point fort',

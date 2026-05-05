@@ -199,28 +199,38 @@ class AudioProcessor:
                     print("Whisper model loaded successfully")
                 except Exception as e:
                     print(f"Error loading model, clearing cache and retrying: {e}")
-                    # Clear corrupted cache
+                    # Clear corrupted cache - handle both Unix and Windows paths
                     import shutil
-                    cache_dir = os.path.expanduser("~/.cache/whisper")
-                    if os.path.exists(cache_dir):
-                        shutil.rmtree(cache_dir)
-                        print(f"Cleared cache: {cache_dir}")
+                    cache_dirs = [
+                        os.path.expanduser("~/.cache/whisper"),  # Unix/Linux/Mac
+                        os.path.join(os.path.expanduser("~"), "AppData", "Local", "Cache", "whisper"),  # Windows
+                        os.path.join(os.path.expanduser("~"), ".cache", "whisper"),  # Alternative Windows
+                    ]
+                    for cache_dir in cache_dirs:
+                        if os.path.exists(cache_dir):
+                            try:
+                                shutil.rmtree(cache_dir)
+                                print(f"Cleared cache: {cache_dir}")
+                            except Exception as ce:
+                                print(f"Could not clear {cache_dir}: {ce}")
                     # Retry loading
                     self.whisper_model = whisper.load_model("tiny", device="cpu")
             
-            print("Starting transcription...")
+            print(f"Starting transcription on file: {filepath}")
             result = self.whisper_model.transcribe(filepath, language="en", verbose=False)
             transcription = result.get('text', '').strip()
-            print(f"Transcription complete: {transcription}")
+            print(f"Transcription complete: {transcription if transcription else '[Empty result]'}")
             
             if not transcription:
                 return "[Unable to transcribe - no speech detected]"
             
             return transcription
         except Exception as e:
-            print(f"Transcription skipped: {str(e)}")
+            print(f"Transcription error: {str(e)}")
+            import traceback
+            traceback.print_exc()
             # Return placeholder instead of failing
-            return "[Transcription unavailable - network error. Evaluation based on acoustic features only]"
+            return "[Transcription unavailable - error during processing. Evaluation based on acoustic features only]"
     
     def get_duration(self, audio_data: np.ndarray) -> float:
         """Get audio duration in seconds"""

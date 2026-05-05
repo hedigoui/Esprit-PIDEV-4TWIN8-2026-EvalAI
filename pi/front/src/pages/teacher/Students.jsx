@@ -2,9 +2,30 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TeacherSidebar from '../../components/TeacherSidebar';
 import TopNavbar from '../../components/TopNavbar';
-import { Search, Filter, Eye, ClipboardCheck, MessageCircle, Users, TrendingUp, Calendar, Phone, LayoutGrid, List } from 'lucide-react';
+import { Search, Filter, Eye, ClipboardCheck, MessageCircle, Users, TrendingUp, Calendar, Phone, LayoutGrid, List, Video } from 'lucide-react';
+import { useSocket } from '../../context/SocketContext';
 import { oralPerformanceService } from '../services/oralPerformance.service';
 import { useI18n } from '../../i18n/I18nProvider';
+import { API_BASE_URL } from '../../config/api.js';
+
+/** Wait until Socket.IO finishes connecting (object exists before handshake completes). */
+function waitForSocketConnected(sock, timeoutMs = 15000) {
+  if (!sock) return Promise.resolve(false);
+  if (sock.connected) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const finish = (ok) => {
+      clearTimeout(timer);
+      sock.off('connect', onConnect);
+      sock.off('connect_error', onFail);
+      resolve(ok);
+    };
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    const onConnect = () => finish(true);
+    const onFail = () => finish(false);
+    sock.once('connect', onConnect);
+    sock.once('connect_error', onFail);
+  });
+}
 
 const studentsPageStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
@@ -498,6 +519,47 @@ const studentsPageStyles = `
   .sp-clear-btn:hover {
     background: rgba(227,24,55,0.15);
   }
+
+  .sp-exam-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.9rem 1.15rem;
+    border-radius: 16px;
+    background: rgba(227,24,55,0.06);
+    border: 1px solid rgba(227,24,55,0.14);
+    margin-bottom: 1.25rem;
+    font-size: 0.82rem;
+    color: #475569;
+    line-height: 1.55;
+    font-weight: 500;
+  }
+
+  .sp-exam-alert {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 14px;
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+
+  .sp-exam-alert.warn {
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+  }
+
+  .sp-exam-alert.err {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+  }
+
+  .sp-action-btn.exam:hover {
+    border-color: #7c3aed;
+    background: rgba(124,58,237,0.08);
+    color: #7c3aed;
+  }
 `;
 
 const PAGE_SIZE = 20;
@@ -562,6 +624,7 @@ function enrichStudents(students, performances, t) {
 
 const Students = () => {
   const navigate = useNavigate();
+  const { socket } = useSocket();
   const { t, language } = useI18n();
   const locale = language === 'fr' ? 'fr-FR' : 'en-US';
   const [searchTerm, setSearchTerm] = useState('');
@@ -579,6 +642,7 @@ const Students = () => {
   const [inviteError, setInviteError] = useState('');
   const [inviteSuccess, setInviteSuccess] = useState('');
   const [inviteSending, setInviteSending] = useState(false);
+  const [examAlert, setExamAlert] = useState(null);
   const loadMoreRef = useRef(null);
 
   const currentUser = useMemo(() => {
@@ -600,7 +664,7 @@ const Students = () => {
         ? await oralPerformanceService.getInstructorPerformances(instructorId)
         : performances;
       const response = await fetch(
-        `http://localhost:3000/communication/students?page=${pageToLoad}&limit=${PAGE_SIZE}`,
+        `${API_BASE_URL}/communication/students?page=${pageToLoad}&limit=${PAGE_SIZE}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (response.ok) {
@@ -610,7 +674,7 @@ const Students = () => {
           setPerformances(Array.isArray(perfData) ? perfData : []);
         }
         const enriched = enrichStudents(raw, perfData, t);
-        setStudents((prev) => (append ? mergeById(prev, enriched) : enriched));
+        setStudents((prev) => mergeById(append ? prev : [], enriched));
         const total = typeof data.total === 'number' ? data.total : raw.length;
         setTotalCount(total);
         setHasMore(pageToLoad * PAGE_SIZE < total);
@@ -646,6 +710,53 @@ const Students = () => {
 
   const startConversation = (studentId) => { navigate(`/messages/${studentId}`); };
 
+  const studentMongoId = (s) => String(s._id ?? s.id ?? '');
+
+  const startOnlineExam = async (student) => {
+    const sid = studentMongoId(student);
+    const instructorId = currentUser?.id || currentUser?._id;
+    if (!instructorId) {
+      setExamAlert({ kind: 'err', text: t('teacherStudents.examNotSignedIn') });
+      return;
+    }
+    if (!socket) {
+      setExamAlert({ kind: 'err', text: t('teacherStudents.examSocketMissing') });
+      return;
+    }
+    if (!socket.connected) {
+      const ok = await waitForSocketConnected(socket, 15000);
+      if (!ok) {
+        setExamAlert({ kind: 'err', text: t('teacherStudents.examSocketMissing') });
+        return;
+      }
+    }
+    const roomId = `exam_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+    setExamAlert(null);
+    let settled = false;
+    const to = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      setExamAlert({ kind: 'err', text: t('teacherStudents.examInviteTimeout') });
+    }, 10000);
+    // Ensure the teacher is registered on the socket before sending the invite
+    socket.emit('register', { userId: String(instructorId) });
+
+    socket.emit(
+      'sendExamInvite',
+      { studentId: sid, teacherId: String(instructorId), roomId },
+      (response) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(to);
+        if (response?.status === 'invite_sent') {
+          navigate(`/teacher/exam-room/${roomId}`);
+        } else {
+          setExamAlert({ kind: 'warn', text: t('teacherStudents.studentOfflineExam') });
+        }
+      },
+    );
+  };
+
   const sendInvite = async () => {
     if (!inviteEmail.trim()) {
       setInviteError(t('teacherStudents.inviteEmailRequired'));
@@ -657,7 +768,7 @@ const Students = () => {
     setInviteError('');
     setInviteSuccess('');
     try {
-      const response = await fetch('http://localhost:3000/communication/invitations', {
+      const response = await fetch(`${API_BASE_URL}/communication/invitations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -719,6 +830,11 @@ const Students = () => {
                 <Users size={36} strokeWidth={1.5} />
               </div>
             </div>
+
+
+            {examAlert && (
+              <div className={`sp-exam-alert ${examAlert.kind === 'warn' ? 'warn' : 'err'}`}>{examAlert.text}</div>
+            )}
 
             {/* Header with stats */}
             <div className="sp-header">
@@ -905,6 +1021,9 @@ const Students = () => {
                         <button type="button" onClick={() => startConversation(student._id)} className="sp-action-btn msg" title={t('teacherStudents.sendMessage')}>
                           <MessageCircle size={15} />
                         </button>
+                        <button type="button" onClick={() => startOnlineExam(student)} className="sp-action-btn exam" title={t('teacherStudents.liveExamShort')}>
+                          <Video size={15} />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -943,6 +1062,9 @@ const Students = () => {
                       </button>
                       <button type="button" onClick={() => startConversation(student._id)} className="sp-action-btn msg" title={t('teacherStudents.message')}>
                         <MessageCircle size={15} />
+                      </button>
+                      <button type="button" onClick={() => startOnlineExam(student)} className="sp-action-btn exam" title={t('teacherStudents.liveExamShort')}>
+                        <Video size={15} />
                       </button>
                     </div>
                   </div>

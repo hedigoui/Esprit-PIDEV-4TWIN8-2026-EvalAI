@@ -8,6 +8,7 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import type { Server, Socket } from 'socket.io';
 import { CommunicationService } from './communication.service';
 import { MessageType } from './communication.models';
@@ -32,9 +33,10 @@ export class CommunicationGateway
   constructor(
     private readonly communicationService: CommunicationService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     const token =
       client.handshake.auth?.token ||
       (typeof client.handshake.query?.token === 'string'
@@ -42,22 +44,29 @@ export class CommunicationGateway
         : undefined);
 
     if (!token) {
+      console.log('[socket] No token provided, disconnecting', client.id);
       client.disconnect();
       return;
     }
 
     try {
-      const payload = this.jwtService.verify(token, {
-        secret: process.env.JWT_SECRET || 'your-secret-key',
-      });
-      const userId = payload?.sub;
+      const secret = this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
+      const payload = await this.jwtService.verifyAsync(token, { secret });
+      const userId = payload?.sub || payload?.id;
+
       if (!userId) {
+        console.log('[socket] No userId in payload, disconnecting', client.id);
         client.disconnect();
         return;
       }
-      client.data.userId = userId;
+
+      client.data.userId = String(userId);
+      client.data.user = payload;
+      
       client.join(`user:${userId}`);
-    } catch {
+      console.log(`[socket] User ${userId} connected and joined room user:${userId}`);
+    } catch (err) {
+      console.warn('[socket] Connection unauthorized:', err.message);
       client.disconnect();
     }
   }
@@ -68,6 +77,8 @@ export class CommunicationGateway
       client.leave(`user:${userId}`);
     }
   }
+
+  // --- Messaging Logic ---
 
   emitNewMessage(message: { senderId: string; receiverId: string }, notification?: any) {
     if (!this.server) return;
@@ -128,5 +139,72 @@ export class CommunicationGateway
     this.emitNewMessage(message, notification);
 
     return { ok: true, message };
+  }
+
+  // --- Online Exam Logic ---
+
+  @SubscribeMessage('register')
+  handleRegister(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { userId: string },
+  ) {
+    // Already joined in handleConnection, but kept for client-side compatibility
+    if (data.userId) {
+      client.join(`user:${data.userId}`);
+    }
+    return { status: 'registered' };
+  }
+
+  @SubscribeMessage('sendExamInvite')
+  handleSendExamInvite(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { studentId: string; teacherId: string; roomId: string },
+  ) {
+    console.log(`[Exam] Sending invite from ${data.teacherId} to ${data.studentId}`);
+    
+    // Emit to all sockets in the student's room
+    this.server.to(`user:${data.studentId}`).emit('examInviteReceived', {
+      teacherId: data.teacherId,
+      roomId: data.roomId,
+    });
+    
+    return { status: 'invite_sent' };
+  }
+
+  @SubscribeMessage('acceptExamInvite')
+  handleAcceptExamInvite(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId: string; studentId: string; teacherId: string },
+  ) {
+    console.log(`[Exam] Student ${data.studentId} accepted invite for room ${data.roomId}`);
+    
+    // Student joins the specific exam room
+    client.join(data.roomId);
+    
+    // Notify the teacher (in their personal room) that the student accepted
+    this.server.to(`user:${data.teacherId}`).emit('examInviteAccepted', {
+      studentId: data.studentId,
+      roomId: data.roomId,
+    });
+    
+    return { status: 'joined' };
+  }
+
+  @SubscribeMessage('joinExamRoom')
+  handleJoinExamRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    client.join(data.roomId);
+    return { status: 'joined_room' };
+  }
+
+  @SubscribeMessage('examEvent')
+  handleExamEvent(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId: string; type: string; payload: any },
+  ) {
+    // Broadcast event to others in the room
+    client.to(data.roomId).emit('examEventReceived', data);
   }
 }

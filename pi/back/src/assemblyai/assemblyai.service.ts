@@ -157,6 +157,22 @@ export class AssemblyAIService {
     );
   }
 
+  /** Used by HTTP controller for short dictation / voice login flows. */
+  async transcribeAudio(
+    audioBuffer: Buffer,
+    _languageCode?: string,
+  ): Promise<{ text: string }> {
+    const transcript = await this.transcribeWithRetry(audioBuffer);
+    if (transcript.status === 'error') {
+      throw new Error(
+        typeof transcript.error === 'string'
+          ? transcript.error
+          : 'Transcription failed',
+      );
+    }
+    return { text: transcript.text ?? '' };
+  }
+
   async evaluateAudio(audioBuffer: Buffer): Promise<EvaluationResult> {
     this.logger.log('========== STARTING ASSEMBLYAI EVALUATION ==========');
 

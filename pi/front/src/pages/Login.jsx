@@ -69,6 +69,7 @@ const Login = () => {
         }
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        window.dispatchEvent(new Event('evalai:user-updated'));
         if (rememberMe) localStorage.setItem('rememberMe', 'true');
         else localStorage.removeItem('rememberMe');
         const userRole = data.user?.role;
