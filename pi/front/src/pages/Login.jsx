@@ -93,7 +93,7 @@ const Login = () => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError(t('login.cannotConnectServer'));
+      setError(t('login.cannotConnect'));
     } finally { setLoading(false); }
   };
 
