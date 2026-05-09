@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Res, Post } from '@nestjs/common';
 import { CertificateService } from './certificate.service';
-import { Response } from 'express';
+import type { Response } from 'express'; // Use 'import type' for isolatedModules
 
 @Controller('certificates')
 export class CertificateController {

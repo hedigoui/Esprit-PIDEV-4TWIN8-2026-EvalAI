@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Certificate, CertificateStatus } from './entities/certificate.entity';
-import { OralEvaluation } from './entities/oral-evaluation.entity';
-import { OralPerformance } from '../oral-performance/oral-performance.entity';
-import { Users } from '../users/users.entity';
-import { GridFSService } from '../gridfs/gridfs.service';
-import PDFDocument from 'pdfkit';
 import { ObjectId } from 'mongodb';
+import PDFDocument from 'pdfkit';
+import { Repository } from 'typeorm';
+import { GridFSService } from '../gridfs/gridfs.service';
+import { Users } from '../users/users.models';
+import { OralPerformance } from '../oral-performance/oral-performance.entity';
+import { OralEvaluation } from './entities/oral-evaluation.entity';
+import { Certificate, CertificateStatus } from './entities/certificate.entity';
 
 @Injectable()
 export class CertificateService {
@@ -15,39 +15,57 @@ export class CertificateService {
 
 	constructor(
 		@InjectRepository(Certificate)
-		private certificateRepo: Repository<Certificate>,
+		public readonly certificateRepo: Repository<Certificate>,
 		@InjectRepository(OralEvaluation)
-		private evaluationRepo: Repository<OralEvaluation>,
+		private readonly evaluationRepo: Repository<OralEvaluation>,
 		@InjectRepository(OralPerformance)
-		private performanceRepo: Repository<OralPerformance>,
+		private readonly performanceRepo: Repository<OralPerformance>,
 		@InjectRepository(Users)
-		private usersRepo: Repository<Users>,
-		private gridFSService: GridFSService,
+		private readonly usersRepo: Repository<Users>,
+		private readonly gridFSService: GridFSService,
 	) {}
 
 	async generateCertificate(evaluationId: string): Promise<Certificate> {
-		// Fetch evaluation, performance, and user
-		const evaluation = await this.evaluationRepo.findOne({ where: { _id: new ObjectId(evaluationId) } });
-		if (!evaluation) throw new Error('Evaluation not found');
-		const performance = await this.performanceRepo.findOne({ where: { _id: new ObjectId(evaluation.performanceId) } });
-		if (!performance) throw new Error('Performance not found');
-		const user = await this.usersRepo.findOne({ where: { _id: new ObjectId(performance.studentId) } });
-		if (!user) throw new Error('Student not found');
+		const evaluation = await this.evaluationRepo.findOne({
+			where: { _id: new ObjectId(evaluationId) },
+		});
 
-		// Generate certificate number
+		if (!evaluation) {
+			throw new Error('Evaluation not found');
+		}
+
+		const performance = await this.performanceRepo.findOne({
+			where: { _id: new ObjectId(evaluation.performanceId) },
+		});
+
+		if (!performance) {
+			throw new Error('Performance not found');
+		}
+
+		const user = await this.usersRepo.findOne({
+			where: { _id: new ObjectId(performance.studentId) },
+		});
+
+		if (!user) {
+			throw new Error('Student not found');
+		}
+
 		const certificateNumber = this.generateCertificateNumber();
-		const studentName = `${user.firstName} ${user.lastName}`;
-		const cefrLevel = evaluation.cefrLevel || performance.overallProficiency || 'N/A';
+		const studentName = `${user.firstName} ${user.lastName}`.trim();
+		const cefrLevel = evaluation.calibratedCefr || evaluation.contentAnalysis?.cefrLevel || performance.overallProficiency || 'N/A';
 		const issuedDate = new Date();
-
-		// Generate PDF
-		const pdfBuffer = await this.generatePDF(studentName, cefrLevel, certificateNumber, issuedDate);
-
-		// Store PDF in GridFS
+		const pdfBuffer = await this.generatePDF(
+			studentName,
+			cefrLevel,
+			certificateNumber,
+			issuedDate,
+		);
 		const fileName = `certificate-${studentName.replace(/\s+/g, '_')}-${certificateNumber}.pdf`;
-		const fileId = await this.gridFSService.storeAudio(pdfBuffer, fileName, 'application/pdf');
+		const storedFile = await this.gridFSService.storeAudio(pdfBuffer, {
+			filename: fileName,
+			mimeType: 'application/pdf',
+		});
 
-		// Create certificate entity
 		const certificate = this.certificateRepo.create({
 			evaluationId,
 			performanceId: performance._id.toString(),
@@ -56,28 +74,34 @@ export class CertificateService {
 			studentEmail: user.email,
 			cefrLevel,
 			certificateNumber,
-			fileId,
+			fileId: storedFile.fileId,
 			fileName,
 			status: CertificateStatus.GENERATED,
 			issuedDate,
 		});
-		return await this.certificateRepo.save(certificate);
+
+		return this.certificateRepo.save(certificate);
 	}
 
-	async generatePDF(studentName: string, cefrLevel: string, certificateNumber: string, issuedDate: Date): Promise<Buffer> {
+	async generatePDF(
+		studentName: string,
+		cefrLevel: string,
+		certificateNumber: string,
+		issuedDate: Date,
+	): Promise<Buffer> {
 		return new Promise((resolve, reject) => {
 			const doc = new PDFDocument({ size: 'A4', margin: 50 });
 			const buffers: Buffer[] = [];
-			doc.on('data', buffers.push.bind(buffers));
-			doc.on('end', () => {
-				resolve(Buffer.concat(buffers));
-			});
 
-			// Certificate design
+			doc.on('data', (chunk: Buffer) => buffers.push(chunk));
+			doc.on('end', () => resolve(Buffer.concat(buffers)));
+			doc.on('error', reject);
+
 			doc.rect(0, 0, doc.page.width, doc.page.height).lineWidth(8).stroke('#E31837');
 			doc.fontSize(28).fillColor('#E31837').text('Certificate of Achievement', { align: 'center', underline: true });
 			doc.moveDown(2);
-			doc.fontSize(20).fillColor('#222').text(studentName, { align: 'center', bold: true });
+			doc.font('Helvetica-Bold').fontSize(20).fillColor('#222').text(studentName, { align: 'center' });
+			doc.font('Helvetica');
 			doc.moveDown(1);
 			doc.fontSize(16).fillColor('#444').text(`has achieved CEFR Level: ${cefrLevel}`, { align: 'center' });
 			doc.moveDown(2);
@@ -90,7 +114,9 @@ export class CertificateService {
 	}
 
 	async getCertificate(certificateId: string): Promise<Certificate | null> {
-		return this.certificateRepo.findOne({ where: { _id: new ObjectId(certificateId) } });
+		return this.certificateRepo.findOne({
+			where: { _id: new ObjectId(certificateId) },
+		});
 	}
 
 	async getCertificateByEvaluation(evaluationId: string): Promise<Certificate | null> {
@@ -103,12 +129,18 @@ export class CertificateService {
 
 	async downloadCertificate(certificateId: string): Promise<Buffer> {
 		const cert = await this.getCertificate(certificateId);
-		if (!cert || !cert.fileId) throw new Error('Certificate or file not found');
+		if (!cert || !cert.fileId) {
+			throw new Error('Certificate or file not found');
+		}
+
 		return this.gridFSService.getFileAsBuffer(cert.fileId);
 	}
 
 	async markCertificateAsSent(certificateId: string): Promise<void> {
-		await this.certificateRepo.update({ _id: new ObjectId(certificateId) }, { status: CertificateStatus.SENT, sentDate: new Date() });
+		await this.certificateRepo.update(
+			{ _id: new ObjectId(certificateId) },
+			{ status: CertificateStatus.SENT, sentDate: new Date() },
+		);
 	}
 
 	generateCertificateNumber(): string {
