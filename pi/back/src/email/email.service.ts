@@ -357,4 +357,59 @@ export class EmailService {
       throw error;
     }
   }
+  async sendCertificateEmail(
+    email: string,
+    studentName: string,
+    cefrLevel: string,
+    certificateBuffer: Buffer,
+    certificateFileName: string,
+  ): Promise<string> {
+    const mailOptions = {
+      from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Your CEFR Certificate - EvalAI Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 30px; border-radius: 10px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="background: #E31837; width: 60px; height: 60px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+              <span style="color: white; font-size: 24px; font-weight: bold;">E</span>
+            </div>
+            <h1 style="color: #E31837; margin: 0;">Congratulations!</h1>
+          </div>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">Hello <strong>${studentName}</strong>,</p>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">You have successfully completed your oral evaluation and achieved:</p>
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 25px 0; border: 1px solid #eee; text-align: center;">
+            <span style="font-size: 1.2rem; color: #E31837; font-weight: 700;">CEFR Level: ${cefrLevel}</span>
+          </div>
+          <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #ffc107;">
+            <p style="margin: 0; color: #856404; font-size: 14px; line-height: 1.6;">
+              🎓 <strong>Your official certificate is attached to this email as a PDF.</strong>
+            </p>
+          </div>
+          <div style="margin-top: 30px; padding: 20px; background-color: #f0f0f0; border-radius: 5px; text-align: center;">
+            <p style="margin: 0; color: #666;">Best regards,<br><strong>The EvalAI Team</strong></p>
+          </div>
+        </div>
+      `,
+      attachments: [
+        {
+          filename: certificateFileName,
+          content: certificateBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Certificate email sent to ${email}`);
+      return info.messageId || '';
+    } catch (error) {
+      console.error(`❌ Failed to send certificate email to ${email}:`, {
+        message: error.message,
+        code: error.code,
+      });
+      throw error;
+    }
+  }
 }
