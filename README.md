@@ -11,7 +11,7 @@
 ![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
 ![MongoDB](https://img.shields.io/badge/mongodb-Atlas-47A248?style=flat-square&logo=mongodb)
 
-![EvalAI Logo](pi/front/public/logo.svg)
+  <img src="pi/front/public/logo.svg" alt="EvalAI Logo" width="320">
 
 **AI-Supported Web Platform for Oral Performance Assessment**  
 
