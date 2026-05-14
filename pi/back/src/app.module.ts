@@ -141,6 +141,7 @@ import { Users } from './users/users.models';
 import { Reclamation } from './reclamations/reclamations.models';
 import { OralPerformance } from './oral-performance/oral-performance.entity';
 import { OralEvaluation } from './evaluation/entities/oral-evaluation.entity';
+import { Certificate } from './evaluation/entities/certificate.entity';
 import {
   Message,
   Conversation,
@@ -214,6 +215,7 @@ import {
         Reclamation,
         OralPerformance,
         OralEvaluation,
+        Certificate,
       ],
       synchronize: true,
     }),

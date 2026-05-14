@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 
 @Injectable()
 export class EmailService {
-  private resend: Resend;
+  private resend!: Resend;
   private fromEmail: string;
 
   constructor() {
@@ -67,7 +67,7 @@ export class EmailService {
       
       console.log(`✅ Welcome email sent successfully to ${email}`);
       return response.data?.id || '';
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Failed to send welcome email to ${email}:`, {
         message: error.message,
       });
@@ -134,7 +134,7 @@ export class EmailService {
       
       console.log(`✅ Status change email sent successfully to ${email}`);
       return response.data?.id || '';
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Failed to send status change email to ${email}:`, {
         message: error.message,
       });
@@ -207,7 +207,7 @@ export class EmailService {
       
       console.log(`✅ Password reset email sent successfully to ${email}`);
       return response.data?.id || '';
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Failed to send password reset email to ${email}:`, {
         message: error.message,
       });
@@ -290,7 +290,7 @@ export class EmailService {
       
       console.log(`✅ New password email sent successfully to ${email}`);
       return response.data?.id || '';
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Failed to send new password email to ${email}:`, {
         message: error.message,
       });
@@ -305,12 +305,17 @@ export class EmailService {
       title?: string;
       cefrLevel?: string;
       score?: number;
+      scoreMax?: number;
       comments?: string;
     },
   ): Promise<string> {
     const title = payload.title || 'Oral Performance';
     const cefr = payload.cefrLevel || 'N/A';
-    const score = typeof payload.score === 'number' ? `${Math.round(payload.score)}/100` : 'N/A';
+    const scoreMax = payload.scoreMax || 100;
+    const score =
+      typeof payload.score === 'number'
+        ? `${Math.round((payload.score / scoreMax) * 100)}/100`
+        : 'N/A';
     const comments = payload.comments || '';
 
     const htmlContent = `
@@ -348,7 +353,7 @@ export class EmailService {
       });
       console.log(`✅ Evaluation result email sent to ${email}`);
       return response.data?.id || '';
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Failed to send evaluation result email to ${email}:`, {
         message: error.message,
       });
@@ -401,7 +406,7 @@ export class EmailService {
       });
       console.log(`✅ Certificate email sent to ${email}`);
       return response.data?.id || '';
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Failed to send certificate email to ${email}:`, {
         message: error.message,
       });

@@ -333,6 +333,8 @@ function normalizeDisplayScore(raw) {
 }
 
 function scoreFromRow(row) {
+  const total = row.performance?.totalScore;
+  if (typeof total === 'number' && !Number.isNaN(total)) return normalizeDisplayScore(total);
   const o = row.evaluation?.overallScore;
   if (typeof o === 'number' && !Number.isNaN(o)) return normalizeDisplayScore(o);
   return normalizeDisplayScore(row.performance?.totalScore);

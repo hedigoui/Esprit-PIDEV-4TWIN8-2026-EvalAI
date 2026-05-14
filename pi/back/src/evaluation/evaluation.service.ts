@@ -508,7 +508,9 @@ export class EvaluationService {
               status: evaluation.status,
               speechMetrics: evaluation.speechMetrics,
               contentScores: evaluation.contentScores,
-              overallScore: evaluation.contentScores
+              overallScore: typeof performance.totalScore === 'number'
+                ? performance.totalScore
+                : evaluation.contentScores
                 ? Math.round(
                     (
                       (evaluation.speechMetrics?.fluency || 0) +
@@ -579,7 +581,9 @@ export class EvaluationService {
               status: evaluation.status,
               speechMetrics: evaluation.speechMetrics,
               contentScores: evaluation.contentScores,
-              overallScore: evaluation.contentScores
+              overallScore: typeof performance.totalScore === 'number'
+                ? performance.totalScore
+                : evaluation.contentScores
                 ? Math.round(
                     (
                       (evaluation.speechMetrics?.fluency || 0) +

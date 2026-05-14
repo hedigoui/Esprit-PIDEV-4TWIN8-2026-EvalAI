@@ -25,7 +25,12 @@ export class AuthController {
 
       // Redirect to frontend with token
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(jwtResponse.user))}`;
+      const redirectUser = {
+        id: jwtResponse.user.id,
+        role: jwtResponse.user.role,
+        isActive: jwtResponse.user.isActive,
+      };
+      const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(redirectUser))}`;
 
       return res.redirect(redirectUrl);
     } catch (error) {
@@ -55,7 +60,12 @@ export class AuthController {
 
       // Redirect to frontend with token
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(jwtResponse.user))}`;
+      const redirectUser = {
+        id: jwtResponse.user.id,
+        role: jwtResponse.user.role,
+        isActive: jwtResponse.user.isActive,
+      };
+      const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(redirectUser))}`;
 
       return res.redirect(redirectUrl);
     } catch (error) {
