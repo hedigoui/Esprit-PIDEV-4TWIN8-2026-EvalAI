@@ -53,19 +53,45 @@ export default function AuthCallback() {
     }
 
     localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    window.dispatchEvent(new Event('evalai:user-updated'));
-
-    const role = user.role;
-    if (role === 'admin') {
-      navigate('/admin/dashboard', { replace: true });
-    } else if (role === 'instructor') {
-      navigate('/teacher/dashboard', { replace: true });
-    } else if (role === 'student') {
-      navigate('/student/dashboard', { replace: true });
-    } else {
-      navigate('/?error=oauth_role', { replace: true });
-    }
+    
+    // Fetch full user profile using the token
+    fetch(`${import.meta.env.VITE_API_URL || 'https://pi-backend-k23t.onrender.com'}/users/profile/${user.id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+      .then(res => res.json())
+      .then(fullUser => {
+        localStorage.setItem('user', JSON.stringify(fullUser));
+        window.dispatchEvent(new Event('evalai:user-updated'));
+        
+        const role = user.role;
+        if (role === 'admin') {
+          navigate('/admin/dashboard', { replace: true });
+        } else if (role === 'instructor') {
+          navigate('/teacher/dashboard', { replace: true });
+        } else if (role === 'student') {
+          navigate('/student/dashboard', { replace: true });
+        } else {
+          navigate('/?error=oauth_role', { replace: true });
+        }
+      })
+      .catch(() => {
+        // If profile fetch fails, use minimal user data
+        localStorage.setItem('user', JSON.stringify(user));
+        window.dispatchEvent(new Event('evalai:user-updated'));
+        
+        const role = user.role;
+        if (role === 'admin') {
+          navigate('/admin/dashboard', { replace: true });
+        } else if (role === 'instructor') {
+          navigate('/teacher/dashboard', { replace: true });
+        } else if (role === 'student') {
+          navigate('/student/dashboard', { replace: true });
+        } else {
+          navigate('/?error=oauth_role', { replace: true });
+        }
+      });
   }, [navigate, searchParams, t]);
 
   return (

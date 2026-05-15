@@ -23,9 +23,14 @@ export class AuthController {
       const user = await this.oauthService.validateOAuthUser(req.user);
       const jwtResponse = await this.oauthService.generateJWT(user);
 
-      // Redirect to frontend with token
+      // Redirect to frontend with token - only send minimal user data
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(jwtResponse.user))}`;
+      const minimalUser = {
+        id: jwtResponse.user.id,
+        role: jwtResponse.user.role,
+        isActive: jwtResponse.user.isActive,
+      };
+      const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(minimalUser))}`;
 
       return res.redirect(redirectUrl);
     } catch (error) {
@@ -53,9 +58,14 @@ export class AuthController {
       const user = await this.oauthService.validateOAuthUser(req.user);
       const jwtResponse = await this.oauthService.generateJWT(user);
 
-      // Redirect to frontend with token
+      // Redirect to frontend with token - only send minimal user data
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(jwtResponse.user))}`;
+      const minimalUser = {
+        id: jwtResponse.user.id,
+        role: jwtResponse.user.role,
+        isActive: jwtResponse.user.isActive,
+      };
+      const redirectUrl = `${frontendUrl}/auth/callback?token=${jwtResponse.access_token}&user=${encodeURIComponent(JSON.stringify(minimalUser))}`;
 
       return res.redirect(redirectUrl);
     } catch (error) {

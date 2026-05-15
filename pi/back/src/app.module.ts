@@ -31,9 +31,7 @@ import {
     }),
     TypeOrmModule.forRoot({
       type: 'mongodb',
-      host: 'localhost',
-      port: 27017,
-      database: 'evalAI',
+      url: process.env.MONGODB_URI || 'mongodb://localhost:27017/evalAI',
       entities: [
         Users,
         Message,
