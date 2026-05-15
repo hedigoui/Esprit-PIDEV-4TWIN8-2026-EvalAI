@@ -27,6 +27,8 @@ export class EmailService {
       throw new Error('RESEND_API_KEY is not set');
     }
 
+    console.log('📤 Sending email via Resend API:', { to, subject, from: this.fromAddress });
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -43,8 +45,10 @@ export class EmailService {
     });
 
     const raw = await response.text();
+    console.log(`📥 Resend API response (${response.status}):`, raw.substring(0, 500));
 
     if (!response.ok) {
+      console.error('❌ Resend API error:', raw);
       throw new Error(`Resend request failed (${response.status}): ${raw}`);
     }
 
@@ -60,7 +64,7 @@ export class EmailService {
     console.log(`Attempting to send welcome email to ${email} for ${name}`);
 
     const mailOptions = {
-      from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
+      from: this.fromAddress,
       to: email,
       subject: 'Welcome to EvalAI Platform!',
       html: `
@@ -109,6 +113,7 @@ export class EmailService {
         code: err.code,
         command: err.command,
       });
+      throw error;
     }
   }
 
@@ -127,7 +132,7 @@ export class EmailService {
     );
 
     const mailOptions = {
-      from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
+      from: this.fromAddress,
       to: email,
       subject: `Account ${status} - EvalAI Platform`,
       html: `
@@ -177,6 +182,7 @@ export class EmailService {
         code: err.code,
         command: err.command,
       });
+      throw error;
     }
   }
 
@@ -190,7 +196,7 @@ export class EmailService {
     );
 
     const mailOptions = {
-      from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
+      from: this.fromAddress,
       to: email,
       subject: 'Reset Your Password - EvalAI Platform',
       html: `
@@ -251,6 +257,7 @@ export class EmailService {
         code: err.code,
         command: err.command,
       });
+      throw error;
     }
   }
 
@@ -267,7 +274,7 @@ export class EmailService {
       process.env.FRONTEND_URL || 'https://evalai-wz24.onrender.com';
 
     const mailOptions = {
-      from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
+      from: this.fromAddress,
       to: email,
       subject: 'Your New Password - EvalAI Platform',
       html: `
@@ -332,10 +339,13 @@ export class EmailService {
     } catch (error) {
       const err = error as { message?: string; code?: string; command?: string };
       console.error(`❌ Failed to send new password email to ${email}:`, {
+        fullError: error,
         message: err.message,
         code: err.code,
         command: err.command,
       });
+      console.error('Error details:', JSON.stringify(error));
+      throw error;
     }
   }
 
@@ -355,7 +365,7 @@ export class EmailService {
     const comments = payload.comments || '';
 
     const mailOptions = {
-      from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
+      from: this.fromAddress,
       to: email,
       subject: 'Your Evaluation Is Ready - EvalAI Platform',
       html: `
