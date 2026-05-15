@@ -1,7 +1,7 @@
 /** Backend origin (no trailing slash). Must be your Nest API, not GitHub/Google. */
 function normalizeApiBase(raw) {
   const fallback = import.meta.env.DEV
-    ? 'http://localhost:3001'
+    ? 'http://localhost:3000'
     : 'https://pi-backend-k23t.onrender.com';
   const trimmed = (raw || '').trim().replace(/\/$/, '');
   const base = trimmed || fallback;
