@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import StudentSidebar from '../../components/StudentSidebar';
 import TopNavbar from '../../components/TopNavbar';
+import { API_BASE_URL } from '../../config/api';
 import styles from '../../styles/shared.module.css';
 import { LifeBuoy, Send, RefreshCw, Tag, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nProvider';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = API_BASE_URL;
 
 function formatDate(value) {
   const d = value ? new Date(value) : null;
@@ -16,6 +17,7 @@ function formatDate(value) {
 }
 
 const Reclamations = () => {
+  console.log('👨‍🎓 STUDENT Reclamations component loaded');
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,18 +67,20 @@ const Reclamations = () => {
     try {
       setLoading(true);
       setError('');
+      console.log('📡 Fetching student reclamations with token:', token ? 'Token exists' : 'No token');
       const res = await axios.get(`${API_URL}/reclamations/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setItems(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
-      console.error(e);
-      setError(t('reclamations.studentFailedLoad'));
-      if (e?.response?.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        navigate('/', { replace: true });
-      }
+      console.error('❌ Student reclamations fetch error:', e);
+      console.error('Response status:', e?.response?.status);
+      console.error('Response data:', e?.response?.data);
+      setError(
+        e?.response?.status === 401
+          ? t('reclamations.studentFailedLoad') + ' (session not cleared)'
+          : t('reclamations.studentFailedLoad'),
+      );
     } finally {
       setLoading(false);
     }

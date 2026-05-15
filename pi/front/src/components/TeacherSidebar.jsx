@@ -318,7 +318,7 @@ const TeacherSidebar = () => {
     { to: '/teacher/reports', icon: FileText, label: t('sidebar.reports'), section: 'main' },
     { to: '/profile', icon: User, label: t('sidebar.profile'), section: 'account' },
     { to: '/conversations', icon: MessageCircle, label: t('sidebar.messages'), section: 'account' },
-    { to: '/Teacher/reclamations', icon: AlertCircle, label: t('sidebar.reclamations'), section: 'account' },
+    { to: '/teacher/reclamations', icon: AlertCircle, label: t('sidebar.reclamations'), section: 'account' },
     { to: '/teacher/settings', icon: Settings, label: t('sidebar.settings'), section: 'account' },
   ];
 

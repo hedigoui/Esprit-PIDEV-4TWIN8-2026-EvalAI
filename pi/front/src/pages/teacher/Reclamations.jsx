@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import TeacherSidebar from '../../components/TeacherSidebar';
 import TopNavbar from '../../components/TopNavbar';
+import { API_BASE_URL } from '../../config/api';
 import styles from '../../styles/shared.module.css';
 import {
   LifeBuoy,
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nProvider';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = API_BASE_URL;
 
 function formatDate(value) {
   const d = value ? new Date(value) : null;
@@ -24,7 +25,8 @@ function formatDate(value) {
   return d.toLocaleString();
 }
 
-const Reclamations = () => {
+const TeacherReclamationsPage = () => {
+  console.log('🎓 TEACHER Reclamations component loaded');
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -495,4 +497,4 @@ const Reclamations = () => {
   );
 };
 
-export default Reclamations;
+export default TeacherReclamationsPage;

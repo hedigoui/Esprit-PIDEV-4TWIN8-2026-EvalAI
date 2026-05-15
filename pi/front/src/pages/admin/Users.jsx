@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
 import TopNavbar from '../../components/TopNavbar';
+import { API_BASE_URL } from '../../config/api';
 import { Search, Plus, Trash2, Power, PowerOff, X, Users as UsersIcon, TrendingUp } from 'lucide-react';
 import axios from 'axios';
 import styles from '../../styles/shared.module.css';
 import { useI18n } from '../../i18n/I18nProvider';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = API_BASE_URL;
 const PAGE_SIZE = 20;
 
 const usersPageStyles = `
