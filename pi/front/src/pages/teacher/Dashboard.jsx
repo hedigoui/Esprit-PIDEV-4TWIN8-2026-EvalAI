@@ -10,7 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell,
   Tooltip, CartesianGrid,
 } from 'recharts';
-import { API_BASE_URL } from '../../config/api';
+import styles from '../../styles/shared.module.css';
 import { oralPerformanceService } from '../services/oralPerformance.service';
 import { useI18n } from '../../i18n/I18nProvider';
 
@@ -509,7 +509,7 @@ const Dashboard = () => {
       const [statsData, perfData, studentsResponse] = await Promise.all([
         oralPerformanceService.getStatistics(instructorId),
         oralPerformanceService.getInstructorPerformances(instructorId),
-        fetch(`${API_BASE_URL}/users/students`).then((res) => (res.ok ? res.json() : { data: [] })),
+        fetch('http://localhost:3000/users/students').then((res) => (res.ok ? res.json() : { data: [] })),
       ]);
 
       const list = perfData || [];

@@ -6,9 +6,8 @@ import { Search, Plus, Trash2, Power, PowerOff, X, Users as UsersIcon, TrendingU
 import axios from 'axios';
 import styles from '../../styles/shared.module.css';
 import { useI18n } from '../../i18n/I18nProvider';
-import { API_BASE_URL } from '../../config/api';
 
-const API_URL = API_BASE_URL;
+const API_URL = 'http://localhost:3000';
 const PAGE_SIZE = 20;
 
 const usersPageStyles = `

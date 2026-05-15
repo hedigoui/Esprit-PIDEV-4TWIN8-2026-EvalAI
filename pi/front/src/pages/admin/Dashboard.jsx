@@ -5,7 +5,6 @@ import TopNavbar from '../../components/TopNavbar';
 import { Users, GraduationCap, User, Activity, TrendingUp, ArrowUpRight, Shield } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Tooltip, CartesianGrid } from 'recharts';
 import { useI18n } from '../../i18n/I18nProvider';
-import { API_BASE_URL } from '../../config/api';
 const dashStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
@@ -381,10 +380,10 @@ const AdminDashboard = () => {
       try {
         setDataLoading(true);
         const [usersRes, perfRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/users`, {
+          fetch('http://localhost:3000/users', {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`${API_BASE_URL}/oral-performances`, {
+          fetch('http://localhost:3000/oral-performances', {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);

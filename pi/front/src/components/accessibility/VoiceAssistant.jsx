@@ -183,28 +183,23 @@ const VoiceAssistant = () => {
       if (!t) return;
 
       const isLoginPage = location.pathname === '/';
-      const userStr = localStorage.getItem('user');
-      let user = null;
-      try {
-        user = JSON.parse(userStr);
-      } catch (e) {}
-      
-      const isLoggedIn = !isLoginPage && !!user;
-      const role = user?.role || 'student';
+      const isLoggedIn = !isLoginPage && isUserLoggedIn();
 
-      console.log('[Voice] isLoginPage:', isLoginPage, 'isLoggedIn:', isLoggedIn, 'Role:', role);
+      console.log('[Voice] isLoginPage:', isLoginPage, 'isLoggedIn:', isLoggedIn);
 
       // ===== LOGIN PAGE - ENHANCED FLOW =====
       if (isLoginPage) {
         // Help
-        if (matchCommand(t, ['help', 'what can i say', 'commands', 'options']).match) {
+        if (matchCommand(t, [/help|what can i say|commands|options/]).match) {
           speak('Say: set email, set password, or login');
           return;
         }
 
         // SET EMAIL MODE - More flexible matching
         if (
-          matchCommand(t, ['set email', 'enter email', 'email mode']).match ||
+          t === 'set email' || 
+          t.startsWith('set email ') ||
+          t.endsWith(' set email') ||
           (t.includes('set') && t.includes('email'))
         ) {
           console.log('[Voice] → EMAIL MODE');
@@ -215,7 +210,9 @@ const VoiceAssistant = () => {
 
         // SET PASSWORD MODE - More flexible matching
         if (
-          matchCommand(t, ['set password', 'enter password', 'password mode']).match ||
+          t === 'set password' || 
+          t.startsWith('set password ') ||
+          t.endsWith(' set password') ||
           (t.includes('set') && t.includes('password'))
         ) {
           console.log('[Voice] → PASSWORD MODE');
@@ -240,15 +237,23 @@ const VoiceAssistant = () => {
               .replace(/point/gi, '.')               // "point" → .
               .replace(/\s/g, '');                   // remove all spaces
             
+            // If no @ found, try to fix it
             if (!email.includes('@')) {
+              // Try common patterns: assume first part is username, rest is domain
               const parts = email.split('.');
               if (parts.length >= 2) {
+                // Assume single dot means: username.domain
                 email = parts[0] + '@' + parts.slice(1).join('.');
               } else {
+                // No dot either, just accept it and append domain
                 email = email + '@example.com';
               }
             }
+            
+            // Clean up: only keep alphanumeric, @, .
             email = email.replace(/[^a-z0-9@.]/g, '');
+            
+            // Basic cleanup: remove double @ or dots
             email = email.replace(/@+/g, '@').replace(/\.+/g, '.');
             
             if (email && email.length > 3) {
@@ -267,6 +272,7 @@ const VoiceAssistant = () => {
           console.log('[Voice] PASSWORD INPUT:', t);
           const passwordInput = document.getElementById('password');
           if (passwordInput) {
+            // For password, keep numbers and letters but remove most special chars
             const password = t.replace(/[^\w]/g, '').substring(0, 50);
             if (password) {
               setInputValue(passwordInput, password);
@@ -280,7 +286,13 @@ const VoiceAssistant = () => {
         }
 
         // LOGIN - More flexible matching
-        if (matchCommand(t, ['login', 'sign in', 'submit', 'connect']).match) {
+        if (
+          t === 'login' ||
+          t === 'sign in' ||
+          t === 'submit' ||
+          /^(login|sign in|submit)\s*$/.test(t) ||
+          t.endsWith(' login')
+        ) {
           console.log('[Voice] LOGIN');
           const button = document.querySelector('button[type="submit"]');
           if (button) {
@@ -298,13 +310,13 @@ const VoiceAssistant = () => {
       // ===== LOGGED IN COMMANDS - ENHANCED =====
 
       // Help
-      if (matchCommand(t, ['help', 'what can i say', 'commands', 'options']).match) {
+      if (matchCommand(t, [/help|what can i say|commands|options/]).match) {
         speak('Say: dashboard, practice, reports, profile, messages, reclamations, settings, students, evaluate, users, or logout');
         return;
       }
 
       // Logout
-      if (matchCommand(t, ['logout', 'log out', 'sign out', 'disconnect']).match) {
+      if (matchCommand(t, [/logout|log out|sign out/]).match) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         navigate('/');
@@ -317,77 +329,62 @@ const VoiceAssistant = () => {
         return;
       }
 
-      // Navigation - Role Aware
-      if (matchCommand(t, ['dashboard', 'home', 'go home', 'main page']).match) {
-        const path = role === 'admin' ? '/admin/dashboard' : role === 'instructor' ? '/teacher/dashboard' : '/student/dashboard';
-        navigate(path);
+      // Navigation
+      if (matchCommand(t, [/dashboard|home|go home/]).match) {
+        navigate('/student/dashboard');
         speak('Going to dashboard');
         return;
       }
 
-      if (matchCommand(t, ['practice', 'training', 'exercise', 'exercises']).match) {
-        if (role !== 'student') { speak('Practice is only for students'); return; }
+      if (matchCommand(t, [/practice|training|exercise/]).match) {
         navigate('/student/practice');
         speak('Opening practice');
         return;
       }
 
-      if (matchCommand(t, ['report', 'reports', 'my reports', 'performance']).match) {
-        const path = role === 'instructor' ? '/teacher/reports' : role === 'admin' ? '/admin/reports' : '/student/reports';
-        navigate(path);
+      if (matchCommand(t, [/report|reports|my reports/]).match) {
+        navigate('/student/reports');
         speak('Opening reports');
         return;
       }
 
-      if (matchCommand(t, ['profile', 'my profile', 'account', 'me']).match) {
+      if (matchCommand(t, [/profile|my profile|account/]).match) {
         navigate('/profile');
         speak('Opening profile');
         return;
       }
 
-      if (matchCommand(t, ['message', 'messages', 'chat', 'inbox', 'conversations']).match) {
+      if (matchCommand(t, [/message|messages|chat|inbox/]).match) {
         navigate('/conversations');
         speak('Opening messages');
         return;
       }
 
-      if (matchCommand(t, ['reclamation', 'reclamations', 'complaint', 'complaints', 'help request']).match) {
-        const path = role === 'admin' ? '/admin/reclamations' : role === 'instructor' ? '/teacher/reclamations' : '/student/reclamations';
-        navigate(path);
+      if (matchCommand(t, [/reclamation|reclamations|complaint|complaints/]).match) {
+        navigate('/student/reclamations');
         speak('Opening reclamations');
         return;
       }
 
-      if (matchCommand(t, ['settings', 'preference', 'preferences', 'config', 'configuration']).match) {
-        const path = role === 'admin' ? '/admin/settings' : role === 'instructor' ? '/teacher/settings' : '/student/settings';
-        navigate(path);
+      if (matchCommand(t, [/settings|preference|preferences|config/]).match) {
+        navigate('/student/settings');
         speak('Opening settings');
         return;
       }
 
-      if (matchCommand(t, ['students', 'student list', 'my students']).match) {
-        if (role !== 'instructor') { speak('Students list is for teachers'); return; }
+      if (matchCommand(t, [/students|student list/]).match) {
         navigate('/teacher/students');
         speak('Opening students');
         return;
       }
 
-      if (matchCommand(t, ['evaluate', 'evaluation', 'test students', 'grading']).match) {
-        if (role !== 'instructor') { speak('Evaluation is for teachers'); return; }
+      if (matchCommand(t, [/evaluate|evaluation/]).match) {
         navigate('/teacher/evaluate');
         speak('Opening evaluation');
         return;
       }
 
-      if (matchCommand(t, ['evaluations', 'all evaluations']).match) {
-        if (role !== 'instructor') { speak('Evaluations are for teachers'); return; }
-        navigate('/teacher/evaluations');
-        speak('Opening evaluations');
-        return;
-      }
-
-      if (matchCommand(t, ['users', 'admin users', 'manage users', 'all users']).match) {
-        if (role !== 'admin') { speak('User management is for administrators only'); return; }
+      if (matchCommand(t, [/users|admin users|manage users/]).match) {
         navigate('/admin/users');
         speak('Opening users');
         return;
@@ -395,7 +392,6 @@ const VoiceAssistant = () => {
 
       speak('Command not recognized. Say help for available commands.');
     },
-
     [navigate, speak, location.pathname]
   );
 
@@ -419,12 +415,12 @@ const VoiceAssistant = () => {
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
+        retryCountRef.current = 0; // Reset retry counter on successful start
         setListening(true);
         console.log('[Voice] Listening started');
       };
 
       recognition.onresult = (event) => {
-        retryCountRef.current = 0; // SUCCESS: Reset retry counter here instead of onstart
         if (event.results.length > 0) {
           const result = event.results[event.results.length - 1];
           const transcript = result[0].transcript;
@@ -432,9 +428,16 @@ const VoiceAssistant = () => {
           
           console.log('[Voice] Result:', transcript, 'Confidence:', confidence.toFixed(2));
           
+          // More lenient confidence thresholds
+          const isInInputMode = currentFieldRef.current === 'email' || currentFieldRef.current === 'password';
+          const minConfidence = isInInputMode ? 0.3 : 0.4; // Lowered from 0.1 and 0.5
+          
+          // Always process if we have a transcript, regardless of confidence
           if (transcript && transcript.trim().length > 0) {
             setLastTranscript(transcript);
             parseAndRun(transcript);
+          } else {
+            console.log('[Voice] Empty transcript, ignoring');
           }
         }
       };
@@ -443,42 +446,38 @@ const VoiceAssistant = () => {
         console.error('[Voice] Error:', event.error);
         setListening(false);
         
-        // Handle network errors with exponential back-off or limited retries
+        // Handle network errors with retry logic
         if (event.error === 'network') {
           retryCountRef.current = (retryCountRef.current || 0) + 1;
           console.log('[Voice] Network error, retry attempt:', retryCountRef.current);
           
-          if (retryCountRef.current <= 3) {
-            // Increase delay with each attempt (1s, 2s, 3s)
-            const delay = retryCountRef.current * 1000;
-            console.log(`[Voice] Retrying in ${delay}ms...`);
+          if (retryCountRef.current < 3) {
+            // Retry after 500ms
             setTimeout(() => {
-              if (recognitionRef.current && !listening) {
+              console.log('[Voice] Retrying speech recognition...');
+              if (recognitionRef.current) {
                 try {
                   recognitionRef.current.start();
                 } catch (e) {
                   console.warn('[Voice] Retry start error:', e.message);
                 }
               }
-            }, delay);
+            }, 500);
             return;
           } else {
-            speak('I am having trouble reaching the speech service. Please check your internet connection.');
+            speak('Network connection issue. Please check your connection and try again.');
             retryCountRef.current = 0;
             return;
           }
         }
         
-        // Only reset retry count on other errors if we want to give up
-        if (event.error !== 'no-speech') {
-          retryCountRef.current = 0;
-        }
+        retryCountRef.current = 0;
         
+        // Provide user feedback for different errors
         const errorMessages = {
-          'no-speech': 'I did not hear anything. Please try again.',
-          'audio-capture': 'I cannot find your microphone. Please check your settings.',
-          'permission-denied': 'Microphone access was denied.',
-          'not-allowed': 'Microphone access is blocked by your browser settings.',
+          'no-speech': 'No speech detected. Please try again.',
+          'audio-capture': 'No microphone found. Please check permissions.',
+          'permission-denied': 'Microphone permission denied.',
         };
         
         if (errorMessages[event.error]) {

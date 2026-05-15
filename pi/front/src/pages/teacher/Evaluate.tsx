@@ -367,15 +367,7 @@ const Evaluate: React.FC = () => {
 
   const buildInstructorScoresPayload = (s: Scores) => {
     const clamp = (n: number) => Math.max(1, Math.min(10, Math.round(n)));
-    return {
-      pronunciation: clamp(s.pronunciation),
-      fluency: clamp(s.fluency),
-      vocabulary: clamp(s.confidence),
-      grammar: clamp((s.contentStructure + s.fluency) / 2),
-      comprehension: clamp(s.speakingPace),
-      contentOrganization: clamp(s.contentStructure),
-      overallScore,
-    };
+    return { pronunciation: clamp(s.pronunciation), fluency: clamp(s.fluency), vocabulary: clamp(s.confidence), grammar: clamp((s.contentStructure + s.fluency) / 2), comprehension: clamp(s.speakingPace), contentOrganization: clamp(s.contentStructure) };
   };
 
   const applyPerformanceToForm = (record: Performance): void => {

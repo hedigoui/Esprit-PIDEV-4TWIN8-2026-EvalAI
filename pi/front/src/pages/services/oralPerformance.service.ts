@@ -1,5 +1,3 @@
-import { API_BASE_URL } from '../../config/api';
-
 // ===========================================
 // TYPES & INTERFACES
 // ===========================================
@@ -111,7 +109,7 @@ export interface InstructorRosterRecord {
 // SERVICE IMPLEMENTATION
 // ===========================================
 
-const API_URL = API_BASE_URL;
+const API_URL = 'http://localhost:3000';
 
 async function readFetchError(response: Response, fallback: string): Promise<string> {
   try {

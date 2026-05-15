@@ -1,6 +1,6 @@
 /** Backend origin (no trailing slash). Must be your Nest API, not GitHub/Google. */
 function normalizeApiBase(raw) {
-  const fallback = 'https://pi-backend-k23t.onrender.com';
+  const fallback = 'http://localhost:3000';
   const trimmed = (raw || '').trim().replace(/\/$/, '');
   const base = trimmed || fallback;
   // Mis-set VITE_API_URL often causes OAuth links like https://github.com/auth/github → 404

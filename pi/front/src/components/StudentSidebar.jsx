@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Mic, FileText, Settings, LogOut, User, MessageCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, Mic, FileText, Settings, LogOut, User, MessageCircle, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -247,43 +247,6 @@ const sidebarStyles = `
     position: relative;
   }
 
-  .speechocean-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.7rem 0.85rem;
-    border-radius: 12px;
-    border: none;
-    background: linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(37,99,235,0.06) 100%);
-    color: #3b82f6;
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 500;
-    font-family: 'Manrope', sans-serif;
-    width: 100%;
-    transition: all 0.2s;
-    white-space: nowrap;
-    overflow: hidden;
-    margin-bottom: 0.5rem;
-  }
-
-  .speechocean-btn:hover {
-    background: linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(37,99,235,0.12) 100%);
-    color: #2563eb;
-  }
-
-  .speechocean-label {
-    overflow: hidden;
-    opacity: 1;
-    transition: opacity 0.15s;
-    white-space: nowrap;
-  }
-
-  .collapsed .speechocean-label {
-    opacity: 0;
-    width: 0;
-  }
-
   .nav-tooltip {
     position: absolute;
     left: calc(100% + 12px);
@@ -347,11 +310,6 @@ const StudentSidebar = () => {
     localStorage.removeItem('rememberMe');
     window.dispatchEvent(new Event('evalai:user-updated'));
     navigate('/', { replace: true });
-  };
-
-  const handleOpenSpeechOcean = () => {
-    // Navigate to the integrated SpeechOcean page
-    navigate('/speechocean');
   };
 
   const mainItems = navItems.filter(item => item.section === 'main');
@@ -419,13 +377,6 @@ const StudentSidebar = () => {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="nav-item-wrapper">
-            <button onClick={handleOpenSpeechOcean} className="speechocean-btn">
-              <ExternalLink size={20} style={{ flexShrink: 0 }} />
-              <span className="speechocean-label">SpeechOcean</span>
-            </button>
-            {collapsed && <div className="nav-tooltip">SpeechOcean762</div>}
-          </div>
           <div className="nav-item-wrapper">
             <button onClick={handleLogout} className="logout-btn">
               <LogOut size={20} style={{ flexShrink: 0 }} />

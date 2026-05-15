@@ -34,12 +34,6 @@ export class CreateOralPerformanceDto {
 
 // src/oral-performance/dto/update-scores.dto.ts
 export class UpdateScoresDto {
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  overallScore?: number;
-
   @IsNumber()
   @Min(1)
   @Max(10)

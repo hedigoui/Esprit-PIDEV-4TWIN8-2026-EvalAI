@@ -497,7 +497,7 @@ const Reports = () => {
         const [statsData, perfData, studentsResponse] = await Promise.all([
           oralPerformanceService.getStatistics(instructorId),
           oralPerformanceService.getInstructorPerformances(instructorId),
-          fetch(`${API_BASE_URL}/users/students`).then((r) => (r.ok ? r.json() : { data: [] })),
+          fetch('http://localhost:3000/users/students').then((r) => (r.ok ? r.json() : { data: [] })),
         ]);
         if (cancelled) return;
         const list = perfData || [];

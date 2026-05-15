@@ -5,7 +5,6 @@ import StudentSidebar from '../components/StudentSidebar';
 import AdminSidebar from '../components/AdminSidebar';
 import styles from '../styles/shared.module.css';
 import { useI18n } from '../i18n/I18nProvider';
-import { API_BASE_URL } from '../config/api';
 
 const MessageTest = () => {
   const navigate = useNavigate();
@@ -66,7 +65,7 @@ const MessageTest = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/communication/messages`, {
+      const response = await fetch('http://localhost:3000/communication/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

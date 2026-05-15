@@ -16,9 +16,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nProvider';
 
-import { API_BASE_URL } from '../../config/api';
-
-const API_URL = API_BASE_URL;
+const API_URL = 'http://localhost:3000';
 
 function formatDate(value) {
   const d = value ? new Date(value) : null;

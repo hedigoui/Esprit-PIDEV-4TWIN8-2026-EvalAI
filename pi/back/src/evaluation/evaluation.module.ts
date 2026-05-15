@@ -8,22 +8,17 @@ import { AssemblyAIModule } from '../assemblyai/assemblyai.module';
 import { GridFSModule } from '../gridfs/gridfs.module';
 import { DeepSeekModule } from '../deepseek/deepseek.module';
 import { GeminiModule } from '../gemini/gemini.module';
-import { EmailModule } from '../email/email.module';
-import { Certificate } from './entities/certificate.entity';
-import { CertificateService } from './certificate.service';
-import { Users } from '../users/users.models';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([OralEvaluation, OralPerformance, Certificate, Users]),
+    TypeOrmModule.forFeature([OralEvaluation, OralPerformance]),
     AssemblyAIModule,
     GridFSModule,
     DeepSeekModule,
     GeminiModule,
-    EmailModule,
   ],
   controllers: [EvaluationController],
-  providers: [EvaluationService, CertificateService],
+  providers: [EvaluationService],
   exports: [EvaluationService],
 })
 export class EvaluationModule {}

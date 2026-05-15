@@ -45,7 +45,6 @@ import AdminReclamations from './pages/admin/Reclamations';
 import { NotificationCenterProvider } from './context/NotificationCenter';
 import { SocketProvider } from './context/SocketContext';
 import ExamInviteNotification from './components/ExamInviteNotification';
-import SpeechOceanPage from './pages/SpeechOceanPage';
 
 function AppWithNotifications() {
   return (
@@ -79,7 +78,6 @@ function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/conversations" element={<Conversations />} />
               <Route path="/messages/:userId" element={<Messages />} />
-              <Route path="/speechocean" element={<SpeechOceanPage />} />
               {/* Student Routes */}
               <Route path="/student/dashboard" element={<StudentDashboard />} />
               <Route path="/student/practice" element={<StudentPractice />} />

@@ -14,8 +14,6 @@ import { AssemblyAIService } from '../assemblyai/assemblyai.service';
 import { GridFSService } from '../gridfs/gridfs.service';
 import { DeepSeekService } from '../deepseek/deepseek.service';
 import { GeminiService } from '../gemini/gemini.service';
-import { CertificateService } from './certificate.service';
-import { EmailService } from '../email/email.service';
 import { deriveCefrLevel } from './cefr-calibration.util';
 
 @Injectable()
@@ -31,8 +29,6 @@ export class EvaluationService {
     private gridFSService: GridFSService,
     private deepseekService: DeepSeekService,
     private geminiService: GeminiService,
-    private certificateService: CertificateService,
-    private emailService: EmailService,
   ) {}
 
   async evaluatePerformance(
@@ -97,7 +93,7 @@ export class EvaluationService {
             performance.audioFile.fileId,
           );
           this.logger.log(`✅ Audio retrieved from GridFS (${audioBuffer.length} bytes)`);
-        } catch (gridfsError: any) {
+        } catch (gridfsError) {
           this.logger.error(`❌ GridFS retrieval failed: ${gridfsError.message}`);
           throw new Error(`Failed to retrieve audio file: ${gridfsError.message}`);
         }
@@ -110,7 +106,7 @@ export class EvaluationService {
             await this.assemblyAIService.evaluateAudio(audioBuffer);
           this.logger.log('✅ AssemblyAI response received');
           this.logger.log(`   Transcript length: ${assemblyResult.transcript?.length || 0} characters`);
-        } catch (assemblyError: any) {
+        } catch (assemblyError) {
           this.logger.error(`❌ AssemblyAI evaluation failed: ${assemblyError.message}`);
           throw new Error(`AssemblyAI evaluation failed: ${assemblyError.message}`);
         }
@@ -306,7 +302,7 @@ export class EvaluationService {
             this.logger.log(
               `✅ Content evaluation completed (CEFR ${calibratedCefr} from scores + speech metrics)`,
             );
-          } catch (deepseekError: any) {
+          } catch (deepseekError) {
             this.logger.error(
               `DeepSeek evaluation failed: ${deepseekError.message}`,
             );
@@ -328,25 +324,11 @@ export class EvaluationService {
         // Step 5: Update original performance with all scores
         await this.updatePerformanceScores(performance, evaluation);
 
-        // Step 6: Generate and send certificate to student
-        this.logger.log('🎓 Generating certificate for student...');
-        try {
-          await this.generateAndSendCertificate(
-            evaluation._id.toString(),
-          );
-          this.logger.log('✅ Certificate generated and sent successfully');
-        } catch (certError: any) {
-          this.logger.warn(
-            `⚠️ Certificate generation/sending failed (non-blocking): ${certError.message}`,
-          );
-          // Don't fail the entire evaluation if certificate generation fails
-        }
-
         this.logger.log(
           `✅ Evaluation completed successfully in ${evaluation.processingTime}ms`,
         );
         return evaluation;
-      } catch (error: any) {
+      } catch (error) {
         this.logger.error(
           `Evaluation processing failed: ${error.message}`,
         );
@@ -361,7 +343,7 @@ export class EvaluationService {
         }
         throw error;
       }
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(`❌ evaluatePerformance error: ${error.message}`);
       this.logger.error(`Performance ID: ${performanceId}`);
       this.logger.error(`Error details:`, JSON.stringify({
@@ -481,17 +463,11 @@ export class EvaluationService {
     // Get evaluations for these performances
     const evaluations = await this.evaluationRepo.find();
 
-    // Get certificates for these evaluations
-    const certificates = await this.certificateService.getCertificatesForStudent(studentId);
-
-    // Combine performance, evaluation, and certificate data
+    // Combine performance and evaluation data
     return performances.map((performance) => {
       const evaluation = evaluations.find(
         (e) => e.performanceId === performance._id.toString(),
       );
-      const certificate = evaluation
-        ? certificates.find((c) => c.evaluationId === evaluation._id.toString())
-        : undefined;
       return {
         performance: {
           id: performance._id,
@@ -508,9 +484,7 @@ export class EvaluationService {
               status: evaluation.status,
               speechMetrics: evaluation.speechMetrics,
               contentScores: evaluation.contentScores,
-              overallScore: typeof performance.totalScore === 'number'
-                ? performance.totalScore
-                : evaluation.contentScores
+              overallScore: evaluation.contentScores
                 ? Math.round(
                     (
                       (evaluation.speechMetrics?.fluency || 0) +
@@ -522,16 +496,6 @@ export class EvaluationService {
                   )
                 : null,
               evaluatedAt: evaluation.evaluatedAt,
-              certificate: certificate
-                ? {
-                    id: certificate._id,
-                    status: certificate.status,
-                    fileName: certificate.fileName,
-                    fileId: certificate.fileId,
-                    cefrLevel: certificate.cefrLevel,
-                    issuedDate: certificate.issuedDate,
-                  }
-                : null,
             }
           : null,
       };
@@ -581,9 +545,7 @@ export class EvaluationService {
               status: evaluation.status,
               speechMetrics: evaluation.speechMetrics,
               contentScores: evaluation.contentScores,
-              overallScore: typeof performance.totalScore === 'number'
-                ? performance.totalScore
-                : evaluation.contentScores
+              overallScore: evaluation.contentScores
                 ? Math.round(
                     (
                       (evaluation.speechMetrics?.fluency || 0) +
@@ -617,44 +579,5 @@ export class EvaluationService {
     }
 
     return { success: false, message: 'Evaluation not found' };
-  }
-
-  private async generateAndSendCertificate(evaluationId: string): Promise<void> {
-    try {
-      this.logger.log(`🎓 Starting certificate process for evaluation: ${evaluationId}`);
-
-      // Generate certificate
-      const certificate = await this.certificateService.generateCertificate(
-        evaluationId,
-      );
-
-      // Download the certificate PDF
-      const certificatePDF = await this.certificateService.downloadCertificate(
-        certificate._id.toString(),
-      );
-
-      // Send certificate via email
-      await this.emailService.sendCertificateEmail(
-        certificate.studentEmail,
-        certificate.studentName,
-        certificate.cefrLevel,
-        certificatePDF,
-        certificate.fileName || 'certificate.pdf',
-      );
-
-      // Mark certificate as sent
-      await this.certificateService.markCertificateAsSent(
-        certificate._id.toString(),
-      );
-
-      this.logger.log(
-        `✅ Certificate sent to ${certificate.studentEmail}`,
-      );
-    } catch (error: any) {
-      this.logger.error(
-        `❌ Certificate generation/sending error: ${error.message}`,
-      );
-      throw error;
-    }
   }
 }

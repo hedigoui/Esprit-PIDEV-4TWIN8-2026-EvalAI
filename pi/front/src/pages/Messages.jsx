@@ -8,7 +8,6 @@ import TeacherSidebar from '../components/TeacherSidebar';
 import AdminSidebar from '../components/AdminSidebar';
 import TopNavbar from '../components/TopNavbar';
 import { useI18n } from '../i18n/I18nProvider';
-import { API_BASE_URL } from '../config/api';
 
 // Avatar component - displays DiceBear avatar
 const Avatar = ({ name, avatar, gender, size = 40 }) => {
@@ -57,7 +56,7 @@ const Messages = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/communication/messages/${userId}`, {
+      const response = await fetch(`http://localhost:3000/communication/messages/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -103,7 +102,7 @@ const Messages = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const socket = io(API_BASE_URL, {
+    const socket = io('http://localhost:3000', {
       auth: { token },
     });
     socketRef.current = socket;
@@ -162,7 +161,7 @@ const Messages = () => {
     const token = localStorage.getItem('token');
     if (!token) return false;
 
-    const response = await fetch(`${API_BASE_URL}/communication/messages`, {
+    const response = await fetch('http://localhost:3000/communication/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -196,7 +195,7 @@ const Messages = () => {
       fd.append('duration', String(duration));
     }
 
-    const response = await fetch(`${API_BASE_URL}/communication/messages/upload`, {
+    const response = await fetch('http://localhost:3000/communication/messages/upload', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` },
       body: fd,
@@ -306,7 +305,7 @@ const Messages = () => {
     const token = localStorage.getItem('token');
     if (!token || !messageId) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/communication/messages/${messageId}`, {
+      const res = await fetch(`http://localhost:3000/communication/messages/${messageId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -333,7 +332,7 @@ const Messages = () => {
     const token = localStorage.getItem('token');
     if (!token || !messageId || !editingText.trim()) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/communication/messages/${messageId}`, {
+      const res = await fetch(`http://localhost:3000/communication/messages/${messageId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

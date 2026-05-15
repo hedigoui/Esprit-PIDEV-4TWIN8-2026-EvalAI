@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mic, CheckCircle } from 'lucide-react';
 import styles from './Login.module.css';
-import { API_BASE_URL } from '../config/api';
+import { useI18n } from '../i18n/I18nProvider';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -55,7 +55,7 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/reset-password`, {
+      const response = await fetch('http://localhost:3000/users/reset-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

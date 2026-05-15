@@ -5,7 +5,6 @@ import { Bell, Lock, Volume2, Moon, Eye, EyeOff, CheckCircle, AlertCircle } from
 import { getStoredTheme, setStoredTheme } from '../../theme';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useAccessibilitySettings } from '../../hooks/useAccessibilitySettings';
-import { API_BASE_URL } from '../../config/api';
 
 const settingsPageStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
@@ -305,7 +304,7 @@ const Settings = () => {
     if (!user?.id) { setError(t('teacherSettings.userInfoMissing')); return; }
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/users/change-password`, {
+      const response = await fetch('http://localhost:3000/users/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, currentPassword, newPassword }),

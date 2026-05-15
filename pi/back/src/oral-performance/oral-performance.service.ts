@@ -294,9 +294,7 @@ export class OralPerformanceService {
       (score) => typeof score === 'number',
     );
     const totalScore =
-      typeof scoresDto.overallScore === 'number'
-        ? scoresDto.overallScore
-        : scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
+      scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
 
     let overallProficiency: ProficiencyLevel;
     if (totalScore >= 9) overallProficiency = ProficiencyLevel.PROFICIENT;
@@ -466,7 +464,6 @@ export class OralPerformanceService {
           title: performance.title,
           cefrLevel: performance.feedback?.cefrLevel,
           score: performance.totalScore,
-          scoreMax: 100,
           comments: performance.feedback?.generalComments,
         },
       );

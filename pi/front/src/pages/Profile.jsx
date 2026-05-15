@@ -7,7 +7,6 @@ import TeacherSidebar from '../components/TeacherSidebar';
 import AdminSidebar from '../components/AdminSidebar';
 import TopNavbar from '../components/TopNavbar';
 import { useI18n } from '../i18n/I18nProvider';
-import { API_BASE_URL } from '../config/api';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -42,7 +41,7 @@ const Profile = () => {
       const token = localStorage.getItem('token');
       if (token) {
         didFetch = true;
-        fetch(`${API_BASE_URL}/users/profile/${userData.id}`, {
+        fetch(`http://localhost:3000/users/profile/${userData.id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
           .then(async (res) => ({ ok: res.ok, data: await res.json() }))
@@ -84,7 +83,7 @@ const Profile = () => {
     setSaving(true); setError(''); setSuccess('');
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/users/profile/${user.id}`, {
+      const response = await fetch(`http://localhost:3000/users/profile/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(formData)
@@ -108,7 +107,7 @@ const Profile = () => {
     const fd = new FormData(); fd.append('avatar', file);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/users/profile/${user.id}/avatar`, {
+      const response = await fetch(`http://localhost:3000/users/profile/${user.id}/avatar`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd
       });
       const data = await response.json();

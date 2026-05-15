@@ -63,12 +63,7 @@ async function bootstrap() {
   );
   app.use(passport.initialize());
   passport.serializeUser((user: any, done) => {
-    done(null, {
-      email: user?.email,
-      firstName: user?.firstName,
-      lastName: user?.lastName,
-      provider: user?.provider,
-    });
+    done(null, user);
   });
   passport.deserializeUser((user: any, done) => {
     done(null, user);
