@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Mic, ArrowLeft } from 'lucide-react';
 import styles from './Login.module.css';
+import { API_BASE_URL } from '../config/api';
 import { useI18n } from '../i18n/I18nProvider';
 
 const ForgotPassword = () => {
@@ -20,7 +21,7 @@ const ForgotPassword = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/users/forgot-password', {
+      const response = await fetch(`${API_BASE_URL}/users/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

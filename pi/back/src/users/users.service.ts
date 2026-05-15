@@ -218,6 +218,7 @@ import {
   NotFoundException,
   BadRequestException,
   UnauthorizedException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MongoRepository } from 'typeorm';
@@ -580,18 +581,11 @@ export class UsersService {
       await this.userRepository.save(user);
 
       // Send new password via email
-      this.emailService
-        .sendNewPasswordEmail(
-          user.email,
-          `${user.firstName} ${user.lastName}`,
-          newPassword,
-        )
-        .catch((error) => {
-          console.error(
-            'Background password email sending failed:',
-            error.message,
-          );
-        });
+      await this.emailService.sendNewPasswordEmail(
+        user.email,
+        `${user.firstName} ${user.lastName}`,
+        newPassword,
+      );
 
       console.log('✅ New password generated and email sent');
       return {
@@ -600,6 +594,11 @@ export class UsersService {
       };
     } catch (error) {
       console.error('❌ Error in forgotPassword method:', error);
+      if (error instanceof Error) {
+        throw new InternalServerErrorException(
+          'Unable to send password reset email at the moment',
+        );
+      }
       throw error;
     }
   }

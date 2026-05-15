@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import styles from './Login.module.css';
+import { API_BASE_URL } from '../config/api';
 import { useI18n } from '../i18n/I18nProvider';
 
 function parseUser(raw) {
@@ -55,7 +56,7 @@ export default function AuthCallback() {
     localStorage.setItem('token', token);
     
     // Fetch full user profile using the token
-    fetch(`${import.meta.env.VITE_API_URL || 'https://pi-backend-k23t.onrender.com'}/users/profile/${user.id}`, {
+    fetch(`${API_BASE_URL}/users/profile/${user.id}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },

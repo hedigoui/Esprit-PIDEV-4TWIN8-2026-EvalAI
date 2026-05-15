@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import StudentSidebar from '../../components/StudentSidebar';
 import TopNavbar from '../../components/TopNavbar';
-import { API_BASE_URL } from '../../config/api';
 import styles from '../../styles/shared.module.css';
 import { LifeBuoy, Send, RefreshCw, Tag, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nProvider';
 
-const API_URL = API_BASE_URL;
+const API_URL = import.meta.env.DEV
+  ? 'http://localhost:3000'
+  : 'https://pi-backend-k23t.onrender.com';
 
 function formatDate(value) {
   const d = value ? new Date(value) : null;

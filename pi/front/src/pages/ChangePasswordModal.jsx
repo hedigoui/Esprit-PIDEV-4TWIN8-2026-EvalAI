@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Eye, EyeOff, AlertCircle, CheckCircle, Lock, X } from 'lucide-react';
 import styles from './Login.module.css';
+import { API_BASE_URL } from '../config/api';
 import { useI18n } from '../i18n/I18nProvider';
 
 const ChangePasswordModal = ({ user, token, onClose, onSuccess }) => {
@@ -20,7 +21,7 @@ const ChangePasswordModal = ({ user, token, onClose, onSuccess }) => {
     if (newPassword.length < 6) { setError(t('auth.passwordTooShort')); return; }
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/users/change-temporary-password', {
+      const response = await fetch(`${API_BASE_URL}/users/change-temporary-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ userId: user.id, newPassword }),

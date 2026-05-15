@@ -70,10 +70,16 @@ async function bootstrap() {
   });
   app.use(passport.session());
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const frontendUrl = process.env.FRONTEND_URL || 'https://evalai-wz24.onrender.com';
+  const allowedOrigins = [
+    frontendUrl,
+    'https://evalai-wz24.onrender.com',
+    'http://localhost:3001',
+    'http://localhost:5173',
+  ];
 
   app.enableCors({
-    origin: [frontendUrl, 'http://localhost:3001', 'http://localhost:5173'],
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
@@ -90,6 +96,6 @@ async function bootstrap() {
   await app.listen(activePort);
 
   console.log(`✅ Application is running on: http://localhost:${activePort}`);
-  console.log(`🌐 CORS enabled for: ${frontendUrl}`);
+  console.log(`🌐 CORS enabled for: ${allowedOrigins.join(', ')}`);
 }
 void bootstrap();

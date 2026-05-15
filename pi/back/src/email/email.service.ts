@@ -1,40 +1,59 @@
 import { Injectable } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
+
+type SendMailInput = {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+};
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private readonly fromAddress =
+    process.env.RESEND_FROM_EMAIL ||
+    process.env.EMAIL_FROM ||
+    'EvalAI Platform <onboarding@resend.dev>';
 
   constructor() {
     console.log('Initializing EmailService...');
-    console.log('EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Not set');
-    console.log(
-      'EMAIL_PASSWORD:',
-      process.env.EMAIL_PASSWORD ? 'Set' : 'Not set',
-    );
+    console.log('RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'Set' : 'Not set');
+    console.log('RESEND_FROM_EMAIL:', this.fromAddress);
+  }
 
-    // Configure your email transporter
-    this.transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
+  private async sendMail({ to, subject, html, text }: SendMailInput): Promise<string> {
+    const apiKey = process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY is not set');
+    }
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-      tls: {
-        rejectUnauthorized: false,
-      },
+      body: JSON.stringify({
+        from: this.fromAddress,
+        to: [to],
+        subject,
+        html,
+        text,
+      }),
     });
 
-    // Verify connection configuration
-    this.transporter.verify((error, _success) => {
-      if (error) {
-        console.error('Email transporter verification failed:', error);
-      } else {
-        console.log('Email server is ready to send messages');
-      }
-    });
+    const raw = await response.text();
+
+    if (!response.ok) {
+      throw new Error(`Resend request failed (${response.status}): ${raw}`);
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as { id?: string };
+      return parsed.id || '';
+    } catch {
+      return '';
+    }
   }
 
   async sendWelcomeEmail(email: string, name: string): Promise<void> {
@@ -76,14 +95,19 @@ export class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      const messageId = await this.sendMail({
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+      });
       console.log(`✅ Welcome email sent successfully to ${email}`);
-      console.log('Message ID:', info.messageId);
+      console.log('Message ID:', messageId);
     } catch (error) {
+      const err = error as { message?: string; code?: string; command?: string };
       console.error(`❌ Failed to send welcome email to ${email}:`, {
-        message: error.message,
-        code: error.code,
-        command: error.command,
+        message: err.message,
+        code: err.code,
+        command: err.command,
       });
     }
   }
@@ -139,14 +163,19 @@ export class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      const messageId = await this.sendMail({
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+      });
       console.log(`✅ Status change email sent successfully to ${email}`);
-      console.log('Message ID:', info.messageId);
+      console.log('Message ID:', messageId);
     } catch (error) {
+      const err = error as { message?: string; code?: string; command?: string };
       console.error(`❌ Failed to send status change email to ${email}:`, {
-        message: error.message,
-        code: error.code,
-        command: error.command,
+        message: err.message,
+        code: err.code,
+        command: err.command,
       });
     }
   }
@@ -208,14 +237,19 @@ export class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      const messageId = await this.sendMail({
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+      });
       console.log(`✅ Password reset email sent successfully to ${email}`);
-      console.log('Message ID:', info.messageId);
+      console.log('Message ID:', messageId);
     } catch (error) {
+      const err = error as { message?: string; code?: string; command?: string };
       console.error(`❌ Failed to send password reset email to ${email}:`, {
-        message: error.message,
-        code: error.code,
-        command: error.command,
+        message: err.message,
+        code: err.code,
+        command: err.command,
       });
     }
   }
@@ -229,7 +263,8 @@ export class EmailService {
       `Attempting to send new password email to ${email} for ${name}`,
     );
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl =
+      process.env.FRONTEND_URL || 'https://evalai-wz24.onrender.com';
 
     const mailOptions = {
       from: `"EvalAI Platform" <${process.env.EMAIL_USER}>`,
@@ -287,14 +322,19 @@ export class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      const messageId = await this.sendMail({
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+      });
       console.log(`✅ New password email sent successfully to ${email}`);
-      console.log('Message ID:', info.messageId);
+      console.log('Message ID:', messageId);
     } catch (error) {
+      const err = error as { message?: string; code?: string; command?: string };
       console.error(`❌ Failed to send new password email to ${email}:`, {
-        message: error.message,
-        code: error.code,
-        command: error.command,
+        message: err.message,
+        code: err.code,
+        command: err.command,
       });
     }
   }
@@ -346,13 +386,18 @@ export class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      const messageId = await this.sendMail({
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+      });
       console.log(`✅ Evaluation result email sent to ${email}`);
-      return info.messageId || '';
+      return messageId || '';
     } catch (error) {
+      const err = error as { message?: string; code?: string; command?: string };
       console.error(`❌ Failed to send evaluation result email to ${email}:`, {
-        message: error.message,
-        code: error.code,
+        message: err.message,
+        code: err.code,
       });
       throw error;
     }

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import TeacherSidebar from '../../components/TeacherSidebar';
 import TopNavbar from '../../components/TopNavbar';
-import { API_BASE_URL } from '../../config/api';
 import styles from '../../styles/shared.module.css';
 import {
   LifeBuoy,
@@ -17,7 +16,9 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nProvider';
 
-const API_URL = API_BASE_URL;
+const API_URL = import.meta.env.DEV
+  ? 'http://localhost:3000'
+  : 'https://pi-backend-k23t.onrender.com';
 
 function formatDate(value) {
   const d = value ? new Date(value) : null;
@@ -97,9 +98,7 @@ const TeacherReclamationsPage = () => {
       console.error(e);
       setError(t('reclamations.teacherFailedLoad'));
       if (e?.response?.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        navigate('/', { replace: true });
+        setError(`${t('reclamations.teacherFailedLoad')} (session not cleared)`);
       }
     } finally {
       setLoading(false);
@@ -115,9 +114,9 @@ const TeacherReclamationsPage = () => {
     e.preventDefault();
     if (!ensureTeacher()) return;
 
-    const t = title.trim();
-    const d = description.trim();
-    if (!t || !d) {
+    const titleText = title.trim();
+    const descriptionText = description.trim();
+    if (!titleText || !descriptionText) {
       setError(t('reclamations.teacherFillTitleDesc'));
       return;
     }
@@ -129,8 +128,8 @@ const TeacherReclamationsPage = () => {
       await axios.post(
         `${API_URL}/reclamations/to-admin`,
         {
-          title: t,
-          description: d,
+          title: titleText,
+          description: descriptionText,
           category,
           reporterName: reporterName || undefined,
         },
@@ -146,9 +145,7 @@ const TeacherReclamationsPage = () => {
       console.error(err);
       setError(err?.response?.data?.message || t('reclamations.teacherFailedSend'));
       if (err?.response?.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        navigate('/', { replace: true });
+        setError(`${t('reclamations.teacherFailedSend')} (session not cleared)`);
       }
     } finally {
       setSubmitting(false);
