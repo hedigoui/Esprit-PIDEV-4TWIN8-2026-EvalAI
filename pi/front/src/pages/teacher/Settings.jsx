@@ -304,7 +304,7 @@ const Settings = () => {
     if (!user?.id) { setError(t('teacherSettings.userInfoMissing')); return; }
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/users/change-password', {
+      const response = await fetch(`${API_BASE_URL}/users/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, currentPassword, newPassword }),

@@ -312,7 +312,7 @@ const Settings = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/users/change-password', {
+      const response = await fetch(`${API_BASE_URL}/users/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

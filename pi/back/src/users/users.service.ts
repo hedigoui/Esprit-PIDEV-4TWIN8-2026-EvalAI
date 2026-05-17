@@ -596,7 +596,7 @@ export class UsersService {
       console.error('❌ Error in forgotPassword method:', error);
       if (error instanceof Error) {
         throw new InternalServerErrorException(
-          error.message || 'Unable to send password reset email at the moment',
+          'Unable to send password reset email at the moment',
         );
       }
       throw error;

@@ -6,6 +6,7 @@ import { Download, TrendingUp, Users, ClipboardCheck, Activity, BarChart3, Shiel
 import { exportReportToPdf } from '../../utils/exportPdf';
 import { exportElementToPng } from '../../utils/exportImage';
 import { useI18n } from '../../i18n/I18nProvider';
+import { API_BASE_URL } from '../../config/api';
 const reportsPageStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
@@ -402,10 +403,10 @@ const Reports = () => {
       try {
         setDataLoading(true);
         const [usersRes, perfRes] = await Promise.all([
-          fetch('http://localhost:3000/users', {
+          fetch(`${API_BASE_URL}/users`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch('http://localhost:3000/oral-performances', {
+          fetch(`${API_BASE_URL}/oral-performances`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);

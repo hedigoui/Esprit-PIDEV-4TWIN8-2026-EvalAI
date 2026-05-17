@@ -8,6 +8,7 @@ import AdminSidebar from '../components/AdminSidebar';
 import TopNavbar from '../components/TopNavbar';
 import styles from '../styles/shared.module.css';
 import { useI18n } from '../i18n/I18nProvider';
+import { API_BASE_URL } from '../config/api';
 
 const Avatar = ({ name, avatar, gender, size = 40 }) => {
   const g = gender === 'female' ? 'female' : 'male';
@@ -48,7 +49,7 @@ const Conversations = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) { setConversations([]); return; }
-      const response = await fetch('http://localhost:3000/communication/conversations', {
+      const response = await fetch(`${API_BASE_URL}/communication/conversations`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -62,7 +63,7 @@ const Conversations = () => {
     try {
       setLoadingTeachers(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/users/instructors', {
+      const response = await fetch(`${API_BASE_URL}/users/instructors`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (response.ok) {
@@ -83,7 +84,7 @@ const Conversations = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      const res = await fetch('http://localhost:3000/communication/blocks', {
+      const res = await fetch(`${API_BASE_URL}/communication/blocks`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -100,7 +101,7 @@ const Conversations = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      const res = await fetch('http://localhost:3000/communication/mutes', {
+      const res = await fetch(`${API_BASE_URL}/communication/mutes`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -135,7 +136,7 @@ const Conversations = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const socket = io('http://localhost:3000', {
+    const socket = io(API_BASE_URL, {
       auth: { token },
     });
     socketRef.current = socket;
@@ -171,7 +172,7 @@ const Conversations = () => {
   const deleteConversation = async (otherUserId) => {
     const token = localStorage.getItem('token');
     if (!token || !otherUserId) return;
-    await fetch(`http://localhost:3000/communication/conversations/${otherUserId}`, {
+    await fetch(`${API_BASE_URL}/communication/conversations/${otherUserId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -183,12 +184,12 @@ const Conversations = () => {
     const token = localStorage.getItem('token');
     if (!token || !otherUserId) return;
     if (blockedIds.has(otherUserId)) {
-      await fetch(`http://localhost:3000/communication/blocks/${otherUserId}`, {
+      await fetch(`${API_BASE_URL}/communication/blocks/${otherUserId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
     } else {
-      await fetch('http://localhost:3000/communication/blocks', {
+      await fetch(`${API_BASE_URL}/communication/blocks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,12 +207,12 @@ const Conversations = () => {
     const token = localStorage.getItem('token');
     if (!token || !otherUserId) return;
     if (mutedIds.has(otherUserId)) {
-      await fetch(`http://localhost:3000/communication/mutes/${otherUserId}`, {
+      await fetch(`${API_BASE_URL}/communication/mutes/${otherUserId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
     } else {
-      await fetch('http://localhost:3000/communication/mutes', {
+      await fetch(`${API_BASE_URL}/communication/mutes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +230,7 @@ const Conversations = () => {
     if (!token || !otherUserId) return;
     const reason = window.prompt(t('conversations.reportPrompt'));
     if (reason === null) return;
-    await fetch('http://localhost:3000/communication/reports', {
+    await fetch(`${API_BASE_URL}/communication/reports`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

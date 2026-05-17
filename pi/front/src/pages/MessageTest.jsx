@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config/api';
 import { useNavigate } from 'react-router-dom';
 import TeacherSidebar from '../components/TeacherSidebar';
 import StudentSidebar from '../components/StudentSidebar';
@@ -65,7 +66,7 @@ const MessageTest = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3000/communication/messages', {
+      const response = await fetch(`${API_BASE_URL}/communication/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

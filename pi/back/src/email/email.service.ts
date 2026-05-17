@@ -14,8 +14,6 @@ export class EmailService {
     process.env.EMAIL_FROM ||
     'EvalAI Platform <onboarding@resend.dev>';
 
-  private readonly testRecipient = process.env.EMAIL_TEST_RECIPIENT?.trim();
-
   constructor() {
     console.log('Initializing EmailService...');
     console.log('RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'Set' : 'Not set');
@@ -24,18 +22,12 @@ export class EmailService {
 
   private async sendMail({ to, subject, html, text }: SendMailInput): Promise<string> {
     const apiKey = process.env.RESEND_API_KEY;
-    const recipient = this.testRecipient || to;
 
     if (!apiKey) {
       throw new Error('RESEND_API_KEY is not set');
     }
 
-    console.log('📤 Sending email via Resend API:', {
-      to: recipient,
-      originalTo: to,
-      subject,
-      from: this.fromAddress,
-    });
+    console.log('📤 Sending email via Resend API:', { to, subject, from: this.fromAddress });
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -45,7 +37,7 @@ export class EmailService {
       },
       body: JSON.stringify({
         from: this.fromAddress,
-        to: [recipient],
+        to: [to],
         subject,
         html,
         text,
